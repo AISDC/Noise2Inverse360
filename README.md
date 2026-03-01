@@ -157,3 +157,39 @@ Areas for improvement:
 -   Fine-tuning from previous models (reduces training time from 8--12
     hrs to \~30--60 min)
 -   Exploring alternative architectures beyond U-Net
+
+
+## Citations
+Relevant Citations:    
+```
+@article{https://doi.org/10.1109/TCI.2020.3019647,
+  title={Noise2inverse: Self-supervised deep convolutional denoising for tomography},
+  author={Hendriksen, Allard Adriaan and Pelt, Dani{\"e}l Maria and Batenburg, K Joost},
+  journal={IEEE Transactions on Computational Imaging},
+  volume={6},
+  pages={1320--1335},
+  year={2020},
+  publisher={IEEE}
+}
+
+@article{https://doi.org/10.1038/s41598-021-91084-8,
+  title={Deep denoising for multi-dimensional synchrotron X-ray tomography without high-quality reference data},
+  author={Hendriksen, Allard A and B{\"u}hrer, Minna and Leone, Laura and Merlini, Marco and Vigano, Nicola and Pelt, Dani{\"e}l M and Marone, Federica and Di Michiel, Marco and Batenburg, K Joost},
+  journal={Scientific reports},
+  volume={11},
+  number={1},
+  pages={11895},
+  year={2021},
+  publisher={Nature Publishing Group UK London}
+}
+
+@article{https://doi.org/10.1016/j.tmater.2025.100075,
+  title={Boosting Noise2Inverse via enhanced model selection for denoising computed tomography data},
+  author={Yunker, Austin and Kenesei, Peter and Sharma, Hemant and Park, Jun-Sang and Miceli, Antonino and Kettimuthu, Rajkumar},
+  journal={Tomography of Materials and Structures},
+  pages={100075},
+  year={2025},
+  publisher={Elsevier}
+}    
+
+````   
