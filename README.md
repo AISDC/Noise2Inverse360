@@ -8,25 +8,25 @@ and group norm as the CNN model for denoising.
 <img width="1000" height="371" alt="workflow" src="https://github.com/user-attachments/assets/5bb6e498-d306-487b-a5ac-e1e70e4d6f8a" />
 
 ## Assumptions    
--All output of this project, training results, inference results, trained models are saved inside the directory of the reconstructions. For example:
-    -User: John Smith
-        -Sample 1 Directory:
-            -Provided by the User:
-                -Full Reconstruction (Directory)
-                -Sub-Reconstruction 1 (Directory)
-                -Sub Reconstruction 2 (Directory)
-            -Provided by N2I:
-                -config.yaml 
-                -TrainOutput (Directory)
-                -denoised_slices (Directory)
-                -denoised_volume (Directory)
--Data for training/inference is already created
-    -This project does not contain the capacity to generate the necessary reconstructions for training/inference
--Data for training/inference is saved as .tiff files
-    -Can be either .tif or .tiff
--Model type/size is the same for each dataset
-    -We've found the U-Net model with no skip connections, leaky relu, and group norm to be a robust choice for different samples
--Model can be used for inference even when training is still running
+-All output of this project, training results, inference results, trained models are saved inside the directory of the reconstructions. For example:     
+    -User: John Smith    
+        -Sample 1 Directory:     
+            -Provided by the User:     
+                -Full Reconstruction (Directory)     
+                -Sub-Reconstruction 1 (Directory)    
+                -Sub Reconstruction 2 (Directory)    
+            -Provided by N2I:    
+                -config.yaml     
+                -TrainOutput (Directory)    
+                -denoised_slices (Directory)    
+                -denoised_volume (Directory)    
+-Data for training/inference is already created    
+    -This project does not contain the capacity to generate the necessary reconstructions for training/inference     
+-Data for training/inference is saved as .tiff files     
+    -Can be either .tif or .tiff     
+-Model type/size is the same for each dataset     
+    -We've found the U-Net model with no skip connections, leaky relu, and group norm to be a robust choice for different samples    
+-Model can be used for inference even when training is still running     
 
 ## Features    
 -Automatic batch size optimization for A100/V100 GPUs
@@ -132,6 +132,8 @@ Denoise Volume:
         -Rescale denoised volume
         -Save denoised volume as .tiffs
             -If a subset was selected, an offset is specifed so that the save file names match the start of the subset
+
+<img width="1191" height="981" alt="denoised_example" src="https://github.com/user-attachments/assets/4e8a7f4a-41d3-4b9b-8e2d-e2f2ad7206bd" />
 
 
 ## Contributing    
