@@ -8,6 +8,8 @@ It implements the 2.5D approach utilizing adjacent slices in the deep
 learning model. A simple U-Net model with leaky ReLU and group norm is
 used for denoising.
 
+<img src="figs/workflow.png" width="100%">
+
 ## Assumptions
 
 -   All output (training results, inference results, trained models) are
