@@ -5,7 +5,7 @@ This project provides an implementation of the Noise2Inverse (N2I) framework for
 N2I framework following the 2.5D approach utilizing adjacent slices in the deep learning model. This project utilizes a simple U-Net model with leaky relu
 and group norm as the CNN model for denoising.
 
-<img width="772" height="143" alt="workflow" src="https://github.com/user-attachments/assets/5bb6e498-d306-487b-a5ac-e1e70e4d6f8a" />
+<img width="1000" height="371" alt="workflow" src="https://github.com/user-attachments/assets/5bb6e498-d306-487b-a5ac-e1e70e4d6f8a" />
 
 ## Assumptions    
 -All output of this project, training results, inference results, trained models are saved inside the directory of the reconstructions. For example:
