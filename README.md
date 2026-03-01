@@ -8,7 +8,9 @@ It implements the 2.5D approach utilizing adjacent slices in the deep
 learning model. A simple U-Net model with leaky ReLU and group norm is
 used for denoising.
 
-<img src="figs/workflow.png" width="100%">
+<p align="center">
+  <img src="figs/workflow.png" width="800">
+</p>
 
 ## Assumptions
 
@@ -145,7 +147,7 @@ bash denoise_volume.sh /path/to/config.yaml 500 600
 ### Denoise Example 
 
 <p align="center">
-  <img src="figs/denoised_example2.png" width="100%">
+  <img src="figs/denoised_example2.png" width="800">
 </p>
 
 ## Contributing
