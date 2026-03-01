@@ -147,7 +147,7 @@ bash denoise_volume.sh /path/to/config.yaml 500 600
 ### Denoise Example 
 
 <p align="center">
-  <img src="figs/denoised_example2.png" width="800">
+  <img src="figs/denoised_example3.svg" width="800">
 </p>
 
 ## Contributing
