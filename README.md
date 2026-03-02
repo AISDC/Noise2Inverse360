@@ -55,6 +55,8 @@ used for denoising.
 Create the conda environment:
 
 ``` bash
+git clone https://github.com/AISDC/Noise2Inverse360.git
+cd Noise2Inverse360
 conda env create -f n2i_environment.yml
 ```
 
