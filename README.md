@@ -12,6 +12,27 @@ used for denoising.
   <img src="figs/workflow.svg" width="100%">
 </p>
 
+## Installation
+
+Create the conda environment:
+
+``` bash
+git clone https://github.com/AISDC/Noise2Inverse360.git
+cd Noise2Inverse360
+conda env create -f n2i_environment.yml
+```
+
+Dependencies include:
+
+-   albumentations (data augmentation)
+-   pytorch (2.4.0)
+-   cuda (11.8)
+-   tifffile
+-   tqdm
+-   matplotlib
+-   skimage
+
+
 ## Assumptions
 
 -   All output (training results, inference results, trained models) are
@@ -49,26 +70,6 @@ used for denoising.
         OOM errors.
 -   Support for 2.5D inference with PyTorch
 -   Flexible plug-and-play workflow across different samples/users
-
-## Installation
-
-Create the conda environment:
-
-``` bash
-git clone https://github.com/AISDC/Noise2Inverse360.git
-cd Noise2Inverse360
-conda env create -f n2i_environment.yml
-```
-
-Dependencies include:
-
--   albumentations (data augmentation)
--   pytorch (2.4.0)
--   cuda (11.8)
--   tifffile
--   tqdm
--   matplotlib
--   skimage
 
 ## Project Structure
 
