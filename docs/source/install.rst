@@ -43,7 +43,7 @@ Test the installation
 
     Commands:
 
-        train     Train the Noise2Inverse model (launch via torchrun for DDP)
+        train     Train the Noise2Inverse model
         slice     Denoise a single CT slice
         volume    Denoise the entire CT volume
 

@@ -153,37 +153,30 @@ Training
 denoise train
 -------------
 
-Train the Noise2Inverse model. Because the training uses PyTorch DDP, it must be
-launched via ``torchrun``.
+Train the Noise2Inverse model. ``denoise train`` automatically launches
+``torchrun`` with the correct settings — no manual ``torchrun`` invocation
+is required.
 
 .. note::
 
-   ``torchrun`` is installed inside the ``n2i`` conda environment. If you used a
-   different environment (e.g. ``tomocupy``) to create the sub-reconstructions,
-   make sure to switch back before running training::
+   Make sure the ``n2i`` conda environment is active before running training.
+   If you used a different environment (e.g. ``tomocupy``) to create the
+   sub-reconstructions, switch back first::
 
        $ conda activate n2i
 
-.. warning::
+.. note::
 
-   On systems where user-local packages (``~/.local/lib/python3.9/site-packages/``)
-   are present, they may shadow the conda environment's packages and cause import
-   errors — most commonly a numpy version conflict between ``torch`` and packages
-   installed in ``~/.local``. Always launch training with ``PYTHONNOUSERSITE=1``
-   to prevent this::
-
-       (n2i) $ PYTHONNOUSERSITE=1 torchrun --nproc_per_node=2 -m denoise train \
-                   --config my_experiment.yaml --gpus 0,1
+   ``denoise train`` internally sets ``PYTHONNOUSERSITE=1`` to prevent
+   user-local packages in ``~/.local/`` from shadowing the conda environment.
 
 Launch training with two GPUs::
 
-    (n2i) $ PYTHONNOUSERSITE=1 torchrun --nproc_per_node=2 -m denoise train \\
-                --config my_experiment.yaml --gpus 0,1
+    (n2i) $ denoise train --config my_experiment.yaml --gpus 0,1
 
 For single-GPU training::
 
-    (n2i) $ PYTHONNOUSERSITE=1 torchrun --nproc_per_node=1 -m denoise train \\
-                --config my_experiment.yaml --gpus 0
+    (n2i) $ denoise train --config my_experiment.yaml --gpus 0
 
 Progress is logged to ``~/logs/denoise_<timestamp>.log`` and printed to the console
 with colour-coded levels. Training output (checkpoints, loss curves) is saved to
@@ -194,7 +187,7 @@ with colour-coded levels. Training output (checkpoints, loss curves) is saved to
     (n2i) $ denoise train -h
     usage: denoise train [-h] --config FILE [--gpus IDS]
 
-    Train the Noise2Inverse model (launch via torchrun for DDP)
+    Train the Noise2Inverse model
 
     options:
       -h, --help     show this help message and exit
@@ -300,6 +293,6 @@ Command Reference
     Commands:
 
         prepare   Create N2I sub-reconstructions with tomocupy and write a config file
-        train     Train the Noise2Inverse model (launch via torchrun for DDP)
+        train     Train the Noise2Inverse model
         slice     Denoise a single CT slice
         volume    Denoise the entire CT volume

@@ -127,8 +127,7 @@ This produces `experiment_rec_0/`, `experiment_rec_1/`, and
 ### Training
 
 ``` bash
-PYTHONNOUSERSITE=1 torchrun --nproc_per_node=2 -m denoise train \
-    --config /path/to/experiment_rec_config.yaml --gpus 0,1
+denoise train --config /path/to/experiment_rec_config.yaml --gpus 0,1
 ```
 
 Training workflow:

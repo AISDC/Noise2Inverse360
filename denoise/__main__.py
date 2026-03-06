@@ -14,10 +14,9 @@ Create sub-reconstructions and config (run in the tomocupy environment)::
     (tomocupy) $ denoise prepare --out-path-name /data/exp_rec \\
                      --file-name raw.h5 --energy 50 --pixel-size 1.17
 
-Train the model (requires torchrun for distributed training)::
+Train the model::
 
-    (n2i) $ PYTHONNOUSERSITE=1 torchrun --nproc_per_node=2 -m denoise train \\
-                --config /data/exp_rec_config.yaml --gpus 0,1
+    (n2i) $ denoise train --config /data/exp_rec_config.yaml --gpus 0,1
 
 Denoise a single CT slice::
 
@@ -115,8 +114,7 @@ def prepare(args):
     log.info(
         "Next step:\n"
         "  conda activate n2i\n"
-        "  PYTHONNOUSERSITE=1 torchrun --nproc_per_node=2 -m denoise train \\\n"
-        "      --config %s --gpus 0,1" % config_path
+        "  denoise train --config %s --gpus 0,1" % config_path
     )
 
 
@@ -124,10 +122,9 @@ def train(args):
     """
     Train the Noise2Inverse model using distributed data parallel (DDP).
 
-    Must be launched via torchrun::
-
-        torchrun --nproc_per_node=<N_GPUS> -m denoise train \\
-            --config <yaml> [--gpus <gpu_ids>]
+    When called directly (``denoise train``), this function automatically
+    re-launches itself via ``torchrun`` with ``PYTHONNOUSERSITE=1``, so no
+    manual ``torchrun`` invocation is required.
 
     Parameters
     ----------
@@ -136,6 +133,25 @@ def train(args):
     args.gpus : str
         Comma-separated list of GPU IDs (e.g. ``0,1``).
     """
+    if 'LOCAL_RANK' not in os.environ:
+        # Not inside a torchrun context yet — re-launch via torchrun.
+        import subprocess
+        n_gpus = len(args.gpus.split(',')) if args.gpus else 1
+        env = {**os.environ, 'PYTHONNOUSERSITE': '1'}
+        if args.gpus:
+            env['CUDA_VISIBLE_DEVICES'] = args.gpus
+        cmd = [
+            sys.executable, '-m', 'torch.distributed.run',
+            '--nproc_per_node', str(n_gpus),
+            '-m', 'denoise', 'train',
+            '--config', args.config,
+            '--gpus', args.gpus,
+        ]
+        log.info("Launching training via torchrun (%d GPU(s)) ..." % n_gpus)
+        result = subprocess.run(cmd, env=env)
+        sys.exit(result.returncode)
+
+    # Inside torchrun context — proceed with training.
     if len(args.gpus) > 0:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
     os.environ['OMP_NUM_THREADS'] = str(os.cpu_count())
@@ -219,7 +235,7 @@ def main():
 
     # (command name, function, positional help text)
     cmd_parsers = [
-        ('train',  train,          "Train the Noise2Inverse model (launch via torchrun for DDP)"),
+        ('train',  train,          "Train the Noise2Inverse model"),
         ('slice',  denoise_slice,  "Denoise a single CT slice"),
         ('volume', denoise_volume, "Denoise the entire CT volume"),
     ]

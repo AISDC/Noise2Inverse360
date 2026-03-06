@@ -23,9 +23,10 @@ Training
 --------
 
 Training uses PyTorch Distributed Data Parallel (DDP) across one or more GPUs. The
-``denoise train`` command is intended to be launched via ``torchrun``::
+``denoise train`` command handles ``torchrun`` and ``PYTHONNOUSERSITE`` internally —
+no manual ``torchrun`` invocation is required::
 
-    torchrun --nproc_per_node=2 -m denoise train --config baseline_config.yaml --gpus 0,1
+    denoise train --config baseline_config.yaml --gpus 0,1
 
 The training loop alternates between two "views" (the two sub-reconstructions) and
 minimises an L1 loss augmented by a Laplacian Contrast Loss (LCL) term after a warm-up
