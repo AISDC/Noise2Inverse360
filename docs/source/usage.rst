@@ -56,20 +56,96 @@ The three output directories (``recon_view0/``, ``recon_view1/``,
 ``recon_full/``) must all reside inside the same parent directory, which is
 then set as ``directory_to_reconstructions`` in the configuration file.
 
+Using tomocupy (APS 2-BM)
+--------------------------
+
+At APS 2-BM the standard tool is `tomocupy <https://tomocupy.readthedocs.io>`_.
+Run the full reconstruction first (as you normally would), then run two
+additional reconstructions using alternating projection subsets via
+``--start-proj`` and ``--proj-step``::
+
+    # even-indexed projections (0, 2, 4, ...)
+    (tomocupy) $ tomocupy recon --start-proj 0 --proj-step 2 \
+                    --out-path-name /path/to/experiment_rec_0 \
+                    [... your usual tomocupy options ...]
+
+    # odd-indexed projections (1, 3, 5, ...)
+    (tomocupy) $ tomocupy recon --start-proj 1 --proj-step 2 \
+                    --out-path-name /path/to/experiment_rec_1 \
+                    [... your usual tomocupy options ...]
+
+This produces three directories alongside each other::
+
+    /path/to/
+        experiment_rec/       ← full reconstruction (already exists)
+        experiment_rec_0/     ← even-angle sub-reconstruction
+        experiment_rec_1/     ← odd-angle sub-reconstruction
+
+.. note::
+
+   Use the same pre-processing options (ring removal, phase retrieval,
+   normalisation) for both sub-reconstructions as for the full reconstruction.
+
+denoise prepare
+---------------
+
+The ``denoise prepare`` command automates the two ``tomocupy recon`` calls and
+writes the configuration file in a single step.  It can be run in the
+``tomocupy`` environment (where ``tomocupy`` is available), before switching to
+the ``n2i`` environment for training::
+
+    (tomocupy) $ denoise prepare --out-path-name /path/to/experiment_rec \
+                     [... all your usual tomocupy recon options ...]
+
+This runs ``tomocupy recon`` twice (even and odd projections), producing::
+
+    /path/to/
+        experiment_rec/            ← full reconstruction (already exists)
+        experiment_rec_0/          ← even-angle sub-reconstruction
+        experiment_rec_1/          ← odd-angle sub-reconstruction
+        experiment_rec_config.yaml ← ready-to-use denoise config
+
+Do **not** include ``--start-proj``, ``--proj-step``, or ``--out-path-name``
+in the extra arguments — they are handled automatically.
+
+::
+
+    (tomocupy) $ denoise prepare -h
+    usage: denoise prepare [-h] --out-path-name PATH ...
+
+    Create N2I sub-reconstructions with tomocupy and write a config file
+
+    positional arguments:
+      ...                   All other tomocupy recon arguments passed through verbatim
+
+    options:
+      -h, --help            show this help message and exit
+      --out-path-name PATH  Base output path of the full reconstruction
+
 Initialization
 ==============
 
-Create a configuration file by copying the baseline template::
+If you used ``denoise prepare``, the config file is already written and you can
+proceed directly to training.
 
-    (n2i) $ cp baseline_config.yaml my_experiment.yaml
+If you prefer to set up the config manually, copy the baseline template to the
+**parent directory** of your reconstructions and edit it::
 
-Edit ``my_experiment.yaml`` and set at minimum::
+    (n2i) $ cp /path/to/Noise2Inverse360/baseline_config.yaml \
+               /path/to/experiment_config.yaml
+
+Set at minimum:
+
+.. code-block:: yaml
 
     dataset:
-      directory_to_reconstructions: /path/to/your/reconstructions
-      sub_recon_name0: recon_view0   # folder with even-angle sub-reconstruction tiffs
-      sub_recon_name1: recon_view1   # folder with odd-angle sub-reconstruction tiffs
-      full_recon_name: recon_full    # folder with full-angle reconstruction tiffs
+      directory_to_reconstructions: /path/to          # parent folder containing all three rec dirs
+      sub_recon_name0: experiment_rec_0               # even-angle sub-reconstruction folder
+      sub_recon_name1: experiment_rec_1               # odd-angle sub-reconstruction folder
+      full_recon_name: experiment_rec                 # full reconstruction folder
+
+The config file can live anywhere — the path is passed explicitly to every
+``denoise`` command via ``--config``.
 
 Training
 ========
@@ -189,6 +265,25 @@ The denoised volume is saved as individual TIFF files in
       --start-slice N  Start slice index (default: first slice)
       --end-slice N    End slice index (default: last slice)
 
+Reusing a trained model
+=======================
+
+The trained model captures the **noise statistics of the specific dataset** it
+was trained on — the CT system, detector, photon flux, and reconstruction
+algorithm all influence what the network learns.
+
+**Same beamline and similar acquisition conditions** (energy, exposure, sample
+type): the model can be applied directly to a new reconstruction without
+retraining. Copy the config file used for training, update
+``directory_to_reconstructions`` and the reconstruction folder names, and run
+inference as normal. The ``mean4norm`` and ``std4norm`` values written into the
+config during training handle intensity normalisation automatically.
+
+**Different acquisition conditions** (different energy, significantly different
+noise level, different beamline): the model may still provide some improvement
+but results will be suboptimal. Retraining on sub-reconstructions from the new
+dataset will give the best results.
+
 Command Reference
 =================
 
@@ -204,6 +299,7 @@ Command Reference
 
     Commands:
 
+        prepare   Create N2I sub-reconstructions with tomocupy and write a config file
         train     Train the Noise2Inverse model (launch via torchrun for DDP)
         slice     Denoise a single CT slice
         volume    Denoise the entire CT volume
