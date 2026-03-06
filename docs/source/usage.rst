@@ -178,6 +178,24 @@ For single-GPU training::
 
     (n2i) $ denoise train --config my_experiment.yaml --gpus 0
 
+Any number of GPUs can be used — just list all the IDs. For example, on a
+4-GPU machine::
+
+    (n2i) $ denoise train --config my_experiment.yaml --gpus 0,1,2,3
+
+``denoise train`` counts the comma-separated IDs and sets ``--nproc_per_node``
+accordingly. DDP splits the mini-batch across all GPUs, so doubling the number
+of GPUs roughly halves the time per epoch.
+
+.. tip::
+
+   With more GPUs the effective per-GPU batch size is ``mbsz / n_gpus``.
+   On a 4-GPU machine consider increasing ``mbsz`` in the config (e.g. 64 or
+   128 instead of the default 32) to keep each GPU fully utilised::
+
+       train:
+         mbsz: 128
+
 Progress is logged to ``~/logs/denoise_<timestamp>.log`` and printed to the console
 with colour-coded levels. Training output (checkpoints, loss curves) is saved to
 ``<directory_to_reconstructions>/TrainOutput/``.
@@ -199,6 +217,13 @@ Inference
 
 denoise slice
 -------------
+
+.. tip::
+
+   ``denoise slice`` can be run while training is still in progress.
+   The model checkpoints in ``TrainOutput/`` are updated in-place whenever a
+   new best is found, so you can check denoising quality at any point without
+   waiting for training to finish.
 
 Denoise a single CT slice::
 
