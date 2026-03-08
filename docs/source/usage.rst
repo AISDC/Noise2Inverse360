@@ -200,6 +200,34 @@ Progress is logged to ``~/logs/denoise_<timestamp>.log`` and printed to the cons
 with colour-coded levels. Training output (checkpoints, loss curves) is saved to
 ``<directory_to_reconstructions>/TrainOutput/``.
 
+Three checkpoints are saved independently during training — each updated
+in-place whenever a new best is found:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 40 30
+
+   * - File
+     - Criterion
+     - Recommended use
+   * - ``best_val_model.pth``
+     - Lowest validation L1 loss
+     - **Inference** (best visual quality)
+   * - ``best_lcl_model.pth``
+     - Lowest LCL regularisation loss
+     - Default (conservative)
+   * - ``best_edge_model.pth``
+     - Highest Laplacian edge score
+     - Sharpness-focused comparison
+
+.. note::
+
+   If training is interrupted (e.g. OOM or scheduler walltime), all three
+   checkpoints reflect the best values seen up to that point and are fully
+   usable for inference. For example, training killed at epoch 1710/2000
+   produced ``best_val_model.pth`` at epoch 1705 (val loss 0.053) and
+   ``best_edge_model.pth`` at epoch 1650 — both suitable for inference.
+
 ::
 
     (n2i) $ denoise train -h
@@ -237,15 +265,16 @@ The denoised slice is saved as a TIFF in
 ::
 
     (n2i) $ denoise slice -h
-    usage: denoise slice [-h] --config FILE [--gpus IDS] --slice-number N
+    usage: denoise slice [-h] --config FILE [--gpus IDS] --slice-number N [--checkpoint {val,lcl,edge}]
 
     Denoise a single CT slice
 
     options:
-      -h, --help        show this help message and exit
-      --config FILE     Path to the YAML configuration file
-      --gpus IDS        Comma-separated list of visible GPU IDs (default: 0)
-      --slice-number N  Index of the CT slice to denoise
+      -h, --help                    show this help message and exit
+      --config FILE                 Path to the YAML configuration file
+      --gpus IDS                    Comma-separated list of visible GPU IDs (default: 0)
+      --slice-number N              Index of the CT slice to denoise
+      --checkpoint {val,lcl,edge}   Checkpoint to use (default: lcl)
 
 denoise volume
 --------------
@@ -280,16 +309,59 @@ The denoised volume is saved as individual TIFF files in
 ::
 
     (n2i) $ denoise volume -h
-    usage: denoise volume [-h] --config FILE [--gpus IDS] [--start-slice N] [--end-slice N]
+    usage: denoise volume [-h] --config FILE [--gpus IDS] [--start-slice N] [--end-slice N] [--checkpoint {val,lcl,edge}]
 
     Denoise the entire CT volume
 
     options:
-      -h, --help       show this help message and exit
-      --config FILE    Path to the YAML configuration file
-      --gpus IDS       Comma-separated list of visible GPU IDs (default: 0)
-      --start-slice N  Start slice index (default: first slice)
-      --end-slice N    End slice index (default: last slice)
+      -h, --help                    show this help message and exit
+      --config FILE                 Path to the YAML configuration file
+      --gpus IDS                    Comma-separated list of visible GPU IDs (default: 0)
+      --start-slice N               Start slice index (default: first slice)
+      --end-slice N                 End slice index (default: last slice)
+      --checkpoint {val,lcl,edge}   Checkpoint to use (default: lcl)
+
+Performance example
+^^^^^^^^^^^^^^^^^^^
+
+The table below shows measured wall-clock times for a real APS 2-BM dataset:
+
+* **Volume**: 2426 slices × 3232 × 3232 voxels (~100 GB in RAM)
+* **Training hardware**: 2× NVIDIA V100 32 GB
+* **Inference hardware**: 1× NVIDIA A100 80 GB (batch size 512, auto-selected)
+
+.. list-table::
+   :header-rows: 1
+   :widths: 45 20 15
+
+   * - Stage
+     - Duration
+     - % of inference
+   * - Training (1710/2000 epochs, killed by SIGKILL at ~85%)
+     - 42 h 23 min
+     - —
+   * - Load + normalize TIFFs into RAM
+     - 5 min 59 s
+     - 9 %
+   * - Pre-pad + build patch index
+     - 17 s
+     - < 1 %
+   * - GPU inference (2962 batches × 512 patches)
+     - 41 min 45 s
+     - 62 %
+   * - Stitch patches → volume
+     - 11 min 16 s
+     - 17 %
+   * - Save 2426 TIFFs to disk
+     - 7 min 27 s
+     - 11 %
+   * - **Total inference**
+     - **~67 min**
+     - 100 %
+
+GPU inference dominates the inference pipeline (62%). Loading from disk and
+stitching are the next largest contributors. Training time dwarfs inference
+by ~38×; using 4 GPUs would reduce training to roughly 10–12 hours.
 
 Reusing a trained model
 =======================

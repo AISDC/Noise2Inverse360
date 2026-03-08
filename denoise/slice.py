@@ -38,7 +38,10 @@ def run(args):
 
     # load in model
     n_slices = params['train']['n_slices']
-    path_to_mdl = params['dataset']['directory_to_reconstructions'] + '/' + 'TrainOutput' + '/' + 'best_lcl_model.pth'
+    _ckpt_map = {'val': 'best_val_model.pth', 'lcl': 'best_lcl_model.pth', 'edge': 'best_edge_model.pth'}
+    ckpt_name = _ckpt_map[getattr(args, 'checkpoint', 'lcl')]
+    path_to_mdl = params['dataset']['directory_to_reconstructions'] + '/' + 'TrainOutput' + '/' + ckpt_name
+    log.info("Using checkpoint: %s" % ckpt_name)
     checkpoint = torch.load(path_to_mdl, map_location=torch.device('cpu'))
     model = unet_ns_gn(ich=n_slices, start_filter_size=16, channels_per_group=8)
     model.load_state_dict(checkpoint['model_state_dict'])

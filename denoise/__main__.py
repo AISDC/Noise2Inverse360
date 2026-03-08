@@ -304,6 +304,13 @@ def main():
                 metavar='N',
                 help='Index of the CT slice to denoise',
             )
+            cmd_parser.add_argument(
+                '--checkpoint',
+                type=str,
+                default='lcl',
+                choices=['val', 'lcl', 'edge'],
+                help='Checkpoint to use: val=lowest val loss, lcl=lowest LCL loss, edge=highest edge score',
+            )
 
         elif cmd == 'volume':
             cmd_parser.add_argument(
@@ -319,6 +326,13 @@ def main():
                 default=None,
                 metavar='N',
                 help='End slice index (default: last slice)',
+            )
+            cmd_parser.add_argument(
+                '--checkpoint',
+                type=str,
+                default='lcl',
+                choices=['val', 'lcl', 'edge'],
+                help='Checkpoint to use: val=lowest val loss, lcl=lowest LCL loss, edge=highest edge score',
             )
 
         cmd_parser.set_defaults(_func=func)
