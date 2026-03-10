@@ -11,9 +11,29 @@ This section covers the basics of how to download and install
 Installing from source
 ======================
 
-Install from `Anaconda <https://www.anaconda.com/distribution/>`_ (Python 3.11 recommended).
+Clone the `denoise <https://github.com/AISDC/Noise2Inverse360>`_ repository::
 
-Create and activate a dedicated conda environment::
+    (base) $ git clone https://github.com/AISDC/Noise2Inverse360 denoise
+    (base) $ cd denoise
+
+One-command environment setup (APS machines, linux-64)
+-------------------------------------------------------
+
+A fully-pinned environment file is provided for reproducible installs on
+APS hardware (tocai / tomo4).  It includes Python 3.11, PyTorch 2.6 with
+CUDA 12.4, and all dependencies::
+
+    (base) $ conda env create -f envs/denoise_environment.yml
+    (base) $ conda activate denoise
+    (denoise) $ pip install .
+
+Manual environment setup
+------------------------
+
+For other machines or when you need a different CUDA version, create the
+environment manually.
+
+Install from `Anaconda <https://www.anaconda.com/distribution/>`_ (Python 3.11 recommended)::
 
     (base) $ conda create -n denoise python=3.11
     (base) $ conda activate denoise
@@ -22,21 +42,15 @@ Install PyTorch with CUDA support (adjust the ``cu124`` tag to match your driver
 
     (denoise) $ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-Clone the `denoise <https://github.com/AISDC/Noise2Inverse360>`_ repository::
-
-    (denoise) $ git clone https://github.com/AISDC/Noise2Inverse360 denoise
-
 Install the package.
 
 On a machine **with internet access** (e.g. tocai)::
 
-    (denoise) $ cd denoise
     (denoise) $ pip install .
 
 On a machine **without internet access** (e.g. tomo4), use ``--no-build-isolation``
 so pip reuses the already-installed build tools instead of trying to download them::
 
-    (denoise) $ cd denoise
     (denoise) $ pip install --no-build-isolation .
 
 Test the installation
