@@ -26,10 +26,18 @@ Clone the `denoise <https://github.com/AISDC/Noise2Inverse360>`_ repository::
 
     (denoise) $ git clone https://github.com/AISDC/Noise2Inverse360 denoise
 
-Install the package::
+Install the package.
+
+On a machine **with internet access** (e.g. tocai)::
 
     (denoise) $ cd denoise
     (denoise) $ pip install .
+
+On a machine **without internet access** (e.g. tomo4), use ``--no-build-isolation``
+so pip reuses the already-installed build tools instead of trying to download them::
+
+    (denoise) $ cd denoise
+    (denoise) $ pip install --no-build-isolation .
 
 Test the installation
 =====================
