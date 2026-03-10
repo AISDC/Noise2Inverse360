@@ -92,7 +92,7 @@ denoise prepare
 The ``denoise prepare`` command automates the two ``tomocupy recon`` calls and
 writes the configuration file in a single step.  It can be run in the
 ``tomocupy`` environment (where ``tomocupy`` is available), before switching to
-the ``n2i`` environment for training::
+the ``denoise`` environment for training::
 
     (tomocupy) $ denoise prepare --out-path-name /path/to/experiment_rec \
                      [... all your usual tomocupy recon options ...]
@@ -131,7 +131,7 @@ proceed directly to training.
 If you prefer to set up the config manually, copy the baseline template to the
 **parent directory** of your reconstructions and edit it::
 
-    (n2i) $ cp /path/to/Noise2Inverse360/baseline_config.yaml \
+    (denoise) $ cp /path/to/Noise2Inverse360/baseline_config.yaml \
                /path/to/experiment_config.yaml
 
 Set at minimum:
@@ -159,11 +159,11 @@ is required.
 
 .. note::
 
-   Make sure the ``n2i`` conda environment is active before running training.
+   Make sure the ``denoise`` conda environment is active before running training.
    If you used a different environment (e.g. ``tomocupy``) to create the
    sub-reconstructions, switch back first::
 
-       $ conda activate n2i
+       $ conda activate denoise
 
 .. note::
 
@@ -172,16 +172,16 @@ is required.
 
 Launch training with two GPUs::
 
-    (n2i) $ denoise train --config my_experiment.yaml --gpus 0,1
+    (denoise) $ denoise train --config my_experiment.yaml --gpus 0,1
 
 For single-GPU training::
 
-    (n2i) $ denoise train --config my_experiment.yaml --gpus 0
+    (denoise) $ denoise train --config my_experiment.yaml --gpus 0
 
 Any number of GPUs can be used — just list all the IDs. For example, on a
 4-GPU machine::
 
-    (n2i) $ denoise train --config my_experiment.yaml --gpus 0,1,2,3
+    (denoise) $ denoise train --config my_experiment.yaml --gpus 0,1,2,3
 
 ``denoise train`` counts the comma-separated IDs and sets ``--nproc_per_node``
 accordingly. DDP splits the mini-batch across all GPUs, so doubling the number
@@ -237,7 +237,7 @@ optimiser state (Adam momentum), epoch counter, ``model_updates``, all best
 values, and the full loss history.  If training is interrupted for any reason,
 restart from the last completed epoch with ``--resume``::
 
-    (n2i) $ denoise train --config my_experiment.yaml --gpus 0,1 --resume
+    (denoise) $ denoise train --config my_experiment.yaml --gpus 0,1 --resume
 
 Training continues from epoch ``N+1`` where ``N`` is the last fully completed
 epoch.  All three best-model checkpoints (``best_val_model.pth``,
@@ -258,7 +258,7 @@ usable for inference at any point.
 
 ::
 
-    (n2i) $ denoise train -h
+    (denoise) $ denoise train -h
     usage: denoise train [-h] --config FILE [--gpus IDS] [--resume]
 
     Train the Noise2Inverse model
@@ -284,7 +284,7 @@ denoise slice
 
 Denoise a single CT slice::
 
-    (n2i) $ denoise slice --config my_experiment.yaml --slice-number 500
+    (denoise) $ denoise slice --config my_experiment.yaml --slice-number 500
     2025-01-01 10:00:00,000 - Loading slice 500
     2025-01-01 10:00:05,000 - Saved denoised slice to .../denoised_slices/00500.tiff
 
@@ -293,7 +293,7 @@ The denoised slice is saved as a TIFF in
 
 ::
 
-    (n2i) $ denoise slice -h
+    (denoise) $ denoise slice -h
     usage: denoise slice [-h] --config FILE [--gpus IDS] --slice-number N [--checkpoint {val,lcl,edge}]
 
     Denoise a single CT slice
@@ -318,7 +318,7 @@ denoise volume
 
 Denoise the entire CT volume::
 
-    (n2i) $ denoise volume --config my_experiment.yaml
+    (denoise) $ denoise volume --config my_experiment.yaml
     2025-01-01 10:00:00,000 - Loading data into CPU memory, it will take a while ...
     2025-01-01 10:00:30,000 - Loaded 1000 slices of size 2048x2048
     2025-01-01 10:00:30,100 - Patch volume size: 65536x256x256
@@ -330,14 +330,14 @@ Denoise the entire CT volume::
 
 To denoise only a sub-volume (slices 200 to 400)::
 
-    (n2i) $ denoise volume --config my_experiment.yaml --start-slice 200 --end-slice 400
+    (denoise) $ denoise volume --config my_experiment.yaml --start-slice 200 --end-slice 400
 
 The denoised volume is saved as individual TIFF files in
 ``<directory_to_reconstructions>/denoised_volume/``.
 
 ::
 
-    (n2i) $ denoise volume -h
+    (denoise) $ denoise volume -h
     usage: denoise volume [-h] --config FILE [--gpus IDS] [--start-slice N] [--end-slice N] [--checkpoint {val,lcl,edge}]
 
     Denoise the entire CT volume
@@ -421,7 +421,7 @@ Command Reference
 
 ::
 
-    (n2i) $ denoise -h
+    (denoise) $ denoise -h
     usage: denoise [-h] ...
 
     Noise2Inverse CT denoising library

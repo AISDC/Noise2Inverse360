@@ -11,29 +11,32 @@ This section covers the basics of how to download and install
 Installing from source
 ======================
 
-Install from `Anaconda <https://www.anaconda.com/distribution/>`_ (Python >= 3.9).
+Install from `Anaconda <https://www.anaconda.com/distribution/>`_ (Python 3.11 recommended).
 
 Create and activate a dedicated conda environment::
 
-    (base) $ conda env create -f envs/n2i_environment.yml
-    (base) $ conda activate n2i
-    (n2i) $
+    (base) $ conda create -n denoise python=3.11
+    (base) $ conda activate denoise
+
+Install PyTorch with CUDA support (adjust the ``cu124`` tag to match your driver)::
+
+    (denoise) $ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
 Clone the `denoise <https://github.com/AISDC/Noise2Inverse360>`_ repository::
 
-    (n2i) $ git clone https://github.com/AISDC/Noise2Inverse360 denoise
+    (denoise) $ git clone https://github.com/AISDC/Noise2Inverse360 denoise
 
 Install the package::
 
-    (n2i) $ cd denoise
-    (n2i) $ PYTHONNOUSERSITE=1 pip install .
+    (denoise) $ cd denoise
+    (denoise) $ pip install .
 
 Test the installation
 =====================
 
 ::
 
-    (n2i) $ denoise -h
+    (denoise) $ denoise -h
     usage: denoise [-h] ...
 
     Noise2Inverse CT denoising library
@@ -77,16 +80,29 @@ present before running inference.
 Update
 ======
 
-To update your locally installed version::
+To update your locally installed version, pull the latest code and reinstall.
 
-    (n2i) $ cd denoise
-    (n2i) $ git pull
-    (n2i) $ PYTHONNOUSERSITE=1 pip install .
+On a machine **with internet access** (e.g. tocai)::
+
+    (denoise) $ cd denoise
+    (denoise) $ git pull
+    (denoise) $ pip install .
+
+On a machine **without internet access** (e.g. tomo4), use ``--no-build-isolation``
+so pip reuses the already-installed build tools instead of trying to download them::
+
+    (denoise) $ cd denoise
+    (denoise) $ git pull
+    (denoise) $ pip install --no-build-isolation .
+
+If the conda environment is on a shared filesystem (e.g. NFS/GPFS), installing
+on the internet-facing machine is sufficient — the update is immediately visible
+on all other machines sharing the same environment.
 
 Dependencies
 ============
 
-The full dependency list is in ``envs/n2i_environment.yml``. Key packages::
+The full dependency list is in ``envs/requirements.txt``. Key packages::
 
     pytorch >= 2.0 (with CUDA support)
     tifffile
