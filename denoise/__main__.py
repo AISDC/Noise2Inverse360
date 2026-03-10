@@ -16,19 +16,19 @@ Create sub-reconstructions and config (run in the tomocupy environment)::
 
 Train the model::
 
-    (n2i) $ denoise train --config /data/exp_rec_config.yaml --gpus 0,1
+    (denoise) $ denoise train --config /data/exp_rec_config.yaml --gpus 0,1
 
 Denoise a single CT slice::
 
-    (n2i) $ denoise slice --config baseline_config.yaml --slice-number 500
+    (denoise) $ denoise slice --config baseline_config.yaml --slice-number 500
 
 Denoise the full CT volume::
 
-    (n2i) $ denoise volume --config baseline_config.yaml
+    (denoise) $ denoise volume --config baseline_config.yaml
 
 Denoise a sub-volume (slices 200 to 400)::
 
-    (n2i) $ denoise volume --config baseline_config.yaml \\
+    (denoise) $ denoise volume --config baseline_config.yaml \\
                 --start-slice 200 --end-slice 400
 """
 
@@ -113,7 +113,7 @@ def prepare(args):
     log.info("Config written to: %s" % config_path)
     log.info(
         "Next step:\n"
-        "  conda activate n2i\n"
+        "  conda activate denoise\n"
         "  denoise train --config %s --gpus 0,1" % config_path
     )
 
@@ -253,8 +253,8 @@ def main():
     # --- prepare (does not share --config / --gpus with the other commands) ---
     prep_parser = subparsers.add_parser(
         'prepare',
-        help='Create N2I sub-reconstructions with tomocupy and write a config file',
-        description='Create N2I sub-reconstructions with tomocupy and write a config file',
+        help='Create Noise2Inverse (N2I) sub-reconstructions with tomocupy and write a config file',
+        description='Create Noise2Inverse (N2I) sub-reconstructions with tomocupy and write a config file',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     prep_parser.add_argument(

@@ -89,34 +89,46 @@ This produces three directories alongside each other::
 denoise prepare
 ---------------
 
-The ``denoise prepare`` command automates the two ``tomocupy recon`` calls and
-writes the configuration file in a single step.  It can be run in the
-``tomocupy`` environment (where ``tomocupy`` is available), before switching to
-the ``denoise`` environment for training::
+The ``denoise prepare`` command automates the two ``tomocupy recon`` calls
+needed for Noise2Inverse (N2I) — a self-supervised denoising method that
+trains on pairs of independent sub-reconstructions — and writes the
+configuration file in a single step.  It can be run in the ``tomocupy``
+environment (where ``tomocupy`` is available), before switching to the
+``denoise`` environment for training.
 
-    (tomocupy) $ denoise prepare --out-path-name /path/to/experiment_rec \
-                     [... all your usual tomocupy recon options ...]
+Pass ``--out-path-name`` pointing to the **full reconstruction** that already
+exists, followed by all the ``tomocupy recon`` options you normally use
+(``--file-name``, ``--reconstruction-type``, ``--binning``, etc.).  For
+example::
 
-This runs ``tomocupy recon`` twice (even and odd projections), producing::
+    (tomocupy) $ denoise prepare \
+                     --out-path-name /local/data/tomo/sample_rec \
+                     --file-name /local/data/tomo/sample.h5 \
+                     --reconstruction-type full \
+                     --binning 1 \
+                     --rotation-axis 1024.0
 
-    /path/to/
-        experiment_rec/            ← full reconstruction (already exists)
-        experiment_rec_0/          ← even-angle sub-reconstruction
-        experiment_rec_1/          ← odd-angle sub-reconstruction
-        experiment_rec_config.yaml ← ready-to-use denoise config
+This runs ``tomocupy recon`` twice (even and odd projections) using exactly
+the same options, producing::
+
+    /local/data/tomo/
+        sample_rec/            ← full reconstruction (already exists)
+        sample_rec_0/          ← even-angle sub-reconstruction (N2I input A)
+        sample_rec_1/          ← odd-angle sub-reconstruction  (N2I input B)
+        sample_rec_config.yaml ← ready-to-use denoise config
 
 Do **not** include ``--start-proj``, ``--proj-step``, or ``--out-path-name``
-in the extra arguments — they are handled automatically.
+in the extra arguments — they are set automatically by ``denoise prepare``.
 
 ::
 
     (tomocupy) $ denoise prepare -h
     usage: denoise prepare [-h] --out-path-name PATH ...
 
-    Create N2I sub-reconstructions with tomocupy and write a config file
+    Create Noise2Inverse (N2I) sub-reconstructions with tomocupy and write a config file
 
     positional arguments:
-      ...                   All other tomocupy recon arguments passed through verbatim
+      tomocupy_args         All other tomocupy recon arguments passed through verbatim
 
     options:
       -h, --help            show this help message and exit
