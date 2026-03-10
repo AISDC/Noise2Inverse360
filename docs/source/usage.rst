@@ -412,21 +412,82 @@ due to system memory pressure. Training time dwarfs inference by ~38×; using
 Reusing a trained model
 =======================
 
-The trained model captures the **noise statistics of the specific dataset** it
-was trained on — the CT system, detector, photon flux, and reconstruction
-algorithm all influence what the network learns.
+The Noise2Inverse model learns the **noise statistics of the imaging system**,
+not anything about the sample itself.  This means the model is fully
+**sample-independent** and can be reused across datasets as long as the
+acquisition conditions that determine the noise remain the same.
 
-**Same beamline and similar acquisition conditions** (energy, exposure, sample
-type): the model can be applied directly to a new reconstruction without
-retraining. Copy the config file used for training, update
-``directory_to_reconstructions`` and the reconstruction folder names, and run
-inference as normal. The ``mean4norm`` and ``std4norm`` values written into the
-config during training handle intensity normalisation automatically.
+What the model learns
+---------------------
 
-**Different acquisition conditions** (different energy, significantly different
-noise level, different beamline): the model may still provide some improvement
-but results will be suboptimal. Retraining on sub-reconstructions from the new
-dataset will give the best results.
+The network characterises:
+
+* Detector read noise and dark current
+* Shot noise at the specific photon flux (energy × exposure × beam current)
+* Scintillator glow and afterglow patterns
+* Ring artifact signatures from detector pixel non-uniformity
+* Any systematic noise from the lens and optic combination
+
+What does **not** affect reusability:
+
+* Sample composition, density, or size
+* Rotation axis position
+* Number of projections (within reason)
+* Binning (as long as ``psz`` in the config matches the binned pixel size)
+
+When to reuse vs. retrain
+--------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 50 25 25
+
+   * - Condition
+     - Reuse model?
+     - Action
+   * - Same beamline, same detector, same energy, same exposure
+     - **Yes**
+     - Update config paths only
+   * - Same setup, different sample
+     - **Yes**
+     - Update config paths only
+   * - Same setup, different binning
+     - **Yes** (if ``psz`` adjusted)
+     - Update ``psz`` in config
+   * - Same setup, slightly different exposure (±20%)
+     - **Likely yes**
+     - Try inference; retrain if quality is poor
+   * - Different energy or significantly different flux
+     - **No**
+     - Retrain on new sub-reconstructions
+   * - Different detector or scintillator
+     - **No**
+     - Retrain on new sub-reconstructions
+   * - Different beamline
+     - **No**
+     - Retrain on new sub-reconstructions
+
+How to reuse
+------------
+
+Copy the config file used for training, update the three path fields, and
+run inference as normal::
+
+    dataset:
+      directory_to_reconstructions: /path/to/new_experiment   # ← update
+      sub_recon_name0: new_experiment_rec_0                    # ← update
+      sub_recon_name1: new_experiment_rec_1                    # ← update
+      full_recon_name: new_experiment_rec                      # ← update
+      mean4norm: 0.1234    # ← keep from original training config
+      std4norm:  0.0567    # ← keep from original training config
+
+The ``mean4norm`` and ``std4norm`` values written by the training script
+handle intensity normalisation automatically — the new sample's absorption
+does not matter.
+
+Then run inference directly::
+
+    (denoise) $ denoise volume --config new_experiment_config.yaml --checkpoint val
 
 Command Reference
 =================
