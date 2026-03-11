@@ -121,23 +121,69 @@ and the exact command to run next::
    phase retrieval, normalisation) for both sub-reconstructions as for the
    full reconstruction.
 
-   After generating the directories manually, copy the baseline config
-   template and fill in the four path fields::
+   Because ``denoise prepare`` was not used, no config file was written
+   automatically.  Create one manually by copying the baseline template::
 
        (denoise) $ cp /path/to/Noise2Inverse360/baseline_config.yaml \
                   /path/to/sample_rec_config.yaml
 
-   .. code-block:: yaml
-
-       dataset:
-         directory_to_reconstructions: /path/to        # parent of all three dirs
-         sub_recon_name0: sample_rec_0                 # even-angle sub-reconstruction
-         sub_recon_name1: sample_rec_1                 # odd-angle sub-reconstruction
-         full_recon_name: sample_rec                   # full reconstruction
+   and setting the four path fields to match your directories.
 
    The ``metadata:`` block (used by the model registry for matching) will
    not be present in a manually created config.  You can add it by hand or
    leave it empty — training will proceed normally either way.
+
+   **Practical example** (APS 2-BM, February 2026 Chawla dataset)::
+
+       # even-indexed projections
+       (tomocupy) $ tomocupy recon_steps \
+                       --file-name /data3/2BM/2026-02/Chawla/As-cast-Mod2-100mm_115.h5 \
+                       --reconstruction-type full \
+                       --rotation-axis 1625 \
+                       --propagation-distance 100 \
+                       --energy 30 \
+                       --retrieve-phase-method paganin \
+                       --retrieve-phase-alpha 0.0005 \
+                       --pixel-size 0.69 \
+                       --fbp-filter ramp \
+                       --remove-stripe-method fw \
+                       --start-proj 0 --proj-step 2 \
+                       --out-path-name /data3/2BM/2026-02/Chawla_rec/As-cast-Mod2-100mm_115_rec_0
+
+       # odd-indexed projections
+       (tomocupy) $ tomocupy recon_steps \
+                       --file-name /data3/2BM/2026-02/Chawla/As-cast-Mod2-100mm_115.h5 \
+                       --reconstruction-type full \
+                       --rotation-axis 1625 \
+                       --propagation-distance 100 \
+                       --energy 30 \
+                       --retrieve-phase-method paganin \
+                       --retrieve-phase-alpha 0.0005 \
+                       --pixel-size 0.69 \
+                       --fbp-filter ramp \
+                       --remove-stripe-method fw \
+                       --start-proj 1 --proj-step 2 \
+                       --out-path-name /data3/2BM/2026-02/Chawla_rec/As-cast-Mod2-100mm_115_rec_1
+
+   This produces::
+
+       /data3/2BM/2026-02/Chawla_rec/
+           As-cast-Mod2-100mm_115_rec/    ← full reconstruction (already exists)
+           As-cast-Mod2-100mm_115_rec_0/  ← even-angle sub-reconstruction
+           As-cast-Mod2-100mm_115_rec_1/  ← odd-angle sub-reconstruction
+
+   Create the config::
+
+       (denoise) $ cp /path/to/Noise2Inverse360/baseline_config.yaml \
+                  /data3/2BM/2026-02/Chawla_rec/As-cast-Mod2-100mm_115_config.yaml
+
+   .. code-block:: yaml
+
+       dataset:
+         directory_to_reconstructions: /data3/2BM/2026-02/Chawla_rec
+         sub_recon_name0: As-cast-Mod2-100mm_115_rec_0
+         sub_recon_name1: As-cast-Mod2-100mm_115_rec_1
+         full_recon_name: As-cast-Mod2-100mm_115_rec
 
 Training
 ========
