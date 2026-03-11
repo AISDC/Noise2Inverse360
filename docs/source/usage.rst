@@ -54,9 +54,6 @@ the same options, producing::
    normalisation) for both sub-reconstructions as for the full reconstruction.
    ``denoise prepare`` guarantees this automatically.
 
-Do **not** include ``--start-proj``, ``--proj-step``, or ``--out-path-name``
-in the extra arguments — they are set automatically by ``denoise prepare``.
-
 When finished, ``denoise prepare`` prints the full path to the config file
 and the exact command to run next::
 
