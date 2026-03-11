@@ -79,6 +79,69 @@ and the exact command to run next::
       -h, --help            show this help message and exit
       --out-path-name PATH  Base output path of the full reconstruction
 
+.. note::
+   **Manual sub-reconstruction (non-tomocupy or non-APS HDF5 data)**
+
+   If your raw data is not in the standard APS HDF5 format, or you prefer a
+   reconstruction tool other than tomocupy, you can create the two
+   sub-reconstructions manually and write the config file by hand.
+
+   **Using tomocupy directly** (e.g. when ``denoise prepare`` is not available
+   in your environment):
+
+   Run the full reconstruction first, then run two additional reconstructions
+   using alternating projection subsets via ``--start-proj`` and
+   ``--proj-step``::
+
+       # even-indexed projections (0, 2, 4, ...)
+       (tomocupy) $ tomocupy recon --start-proj 0 --proj-step 2 \
+                       --out-path-name /path/to/sample_rec_0 \
+                       [... your usual tomocupy options ...]
+
+       # odd-indexed projections (1, 3, 5, ...)
+       (tomocupy) $ tomocupy recon --start-proj 1 --proj-step 2 \
+                       --out-path-name /path/to/sample_rec_1 \
+                       [... your usual tomocupy options ...]
+
+   **Using tomopy / dxchange** (for arbitrary data formats):
+
+   .. code-block:: python
+
+       import tomopy, dxchange
+
+       proj, flat, dark, theta = dxchange.read_aps_2bm('raw_data.h5')
+       proj = tomopy.normalize(proj, flat, dark)
+
+       rec0 = tomopy.recon(proj[0::2], theta[0::2], algorithm='gridrec')
+       rec1 = tomopy.recon(proj[1::2], theta[1::2], algorithm='gridrec')
+       rec_full = tomopy.recon(proj, theta, algorithm='gridrec')
+
+       dxchange.write_tiff_stack(rec0,    'sample_rec_0/recon')
+       dxchange.write_tiff_stack(rec1,    'sample_rec_1/recon')
+       dxchange.write_tiff_stack(rec_full,'sample_rec/recon')
+
+   In both cases, use **the same pre-processing options** (ring removal,
+   phase retrieval, normalisation) for both sub-reconstructions as for the
+   full reconstruction.
+
+   After generating the directories manually, copy the baseline config
+   template and fill in the four path fields::
+
+       (denoise) $ cp /path/to/Noise2Inverse360/baseline_config.yaml \
+                  /path/to/sample_rec_config.yaml
+
+   .. code-block:: yaml
+
+       dataset:
+         directory_to_reconstructions: /path/to        # parent of all three dirs
+         sub_recon_name0: sample_rec_0                 # even-angle sub-reconstruction
+         sub_recon_name1: sample_rec_1                 # odd-angle sub-reconstruction
+         full_recon_name: sample_rec                   # full reconstruction
+
+   The ``metadata:`` block (used by the model registry for matching) will
+   not be present in a manually created config.  You can add it by hand or
+   leave it empty — training will proceed normally either way.
+
 Training
 ========
 
