@@ -9,10 +9,9 @@ Data preparation
 ================
 
 Noise2Inverse requires **two independent sub-reconstructions** produced from
-complementary angular subsets of the raw projections (e.g. even-indexed angles
-and odd-indexed angles). These two sub-reconstructions serve as the training
-pairs: the network learns to predict one from the other, which forces it to
-remove noise without access to any clean reference images.
+complementary angular subsets of the raw projections (even-indexed and
+odd-indexed angles). These serve as training pairs: the network learns to
+predict one from the other, removing noise without any clean reference images.
 
 .. warning::
 
@@ -20,81 +19,13 @@ remove noise without access to any clean reference images.
    You must create the two sub-reconstructions from the raw projection data
    before proceeding.
 
-The sub-reconstructions should be created with the same pre-processing steps
-(ring removal, phase retrieval, normalisation) as the full reconstruction.
-Using `tomopy <https://tomopy.readthedocs.io>`_ and
-`dxchange <https://dxchange.readthedocs.io>`_::
-
-    import tomopy
-    import dxchange
-
-    # load raw projections, flat fields, dark fields, and angles
-    proj, flat, dark, theta = dxchange.read_aps_2bm('raw_data.h5')
-
-    # flat-field correction
-    proj = tomopy.normalize(proj, flat, dark)
-
-    # split into two interleaved angular subsets
-    proj0  = proj[0::2]    # even-indexed projections
-    proj1  = proj[1::2]    # odd-indexed projections
-    theta0 = theta[0::2]
-    theta1 = theta[1::2]
-
-    # reconstruct each subset independently
-    rec0 = tomopy.recon(proj0, theta0, algorithm='gridrec')
-    rec1 = tomopy.recon(proj1, theta1, algorithm='gridrec')
-
-    # reconstruct the full dataset
-    rec_full = tomopy.recon(proj, theta, algorithm='gridrec')
-
-    # save as tiff stacks — each into its own subdirectory
-    dxchange.write_tiff_stack(rec0,    'recon_view0/recon')
-    dxchange.write_tiff_stack(rec1,    'recon_view1/recon')
-    dxchange.write_tiff_stack(rec_full,'recon_full/recon')
-
-The three output directories (``recon_view0/``, ``recon_view1/``,
-``recon_full/``) must all reside inside the same parent directory, which is
-then set as ``directory_to_reconstructions`` in the configuration file.
-
-Using tomocupy (APS 2-BM)
---------------------------
-
-At APS 2-BM the standard tool is `tomocupy <https://tomocupy.readthedocs.io>`_.
-Run the full reconstruction first (as you normally would), then run two
-additional reconstructions using alternating projection subsets via
-``--start-proj`` and ``--proj-step``::
-
-    # even-indexed projections (0, 2, 4, ...)
-    (tomocupy) $ tomocupy recon --start-proj 0 --proj-step 2 \
-                    --out-path-name /path/to/experiment_rec_0 \
-                    [... your usual tomocupy options ...]
-
-    # odd-indexed projections (1, 3, 5, ...)
-    (tomocupy) $ tomocupy recon --start-proj 1 --proj-step 2 \
-                    --out-path-name /path/to/experiment_rec_1 \
-                    [... your usual tomocupy options ...]
-
-This produces three directories alongside each other::
-
-    /path/to/
-        experiment_rec/       ← full reconstruction (already exists)
-        experiment_rec_0/     ← even-angle sub-reconstruction
-        experiment_rec_1/     ← odd-angle sub-reconstruction
-
-.. note::
-
-   Use the same pre-processing options (ring removal, phase retrieval,
-   normalisation) for both sub-reconstructions as for the full reconstruction.
-
 denoise prepare
 ---------------
 
-The ``denoise prepare`` command automates the two ``tomocupy recon`` calls
-needed for Noise2Inverse (N2I) — a self-supervised denoising method that
-trains on pairs of independent sub-reconstructions — and writes the
-configuration file in a single step.  It can be run in the ``tomocupy``
-environment (where ``tomocupy`` is available), before switching to the
-``denoise`` environment for training.
+The ``denoise prepare`` command automates the two tomocupy reconstructions
+needed for Noise2Inverse and writes the configuration file in a single step.
+It runs in the ``tomocupy`` environment (where ``tomocupy`` is available),
+before switching to the ``denoise`` environment for training.
 
 Pass ``--out-path-name`` pointing to the **full reconstruction** that already
 exists, followed by all the ``tomocupy recon`` options you normally use
@@ -116,6 +47,12 @@ the same options, producing::
         sample_rec_0/          ← even-angle sub-reconstruction (N2I input A)
         sample_rec_1/          ← odd-angle sub-reconstruction  (N2I input B)
         sample_rec_config.yaml ← ready-to-use denoise config
+
+.. note::
+
+   Use the same pre-processing options (ring removal, phase retrieval,
+   normalisation) for both sub-reconstructions as for the full reconstruction.
+   ``denoise prepare`` guarantees this automatically.
 
 Do **not** include ``--start-proj``, ``--proj-step``, or ``--out-path-name``
 in the extra arguments — they are set automatically by ``denoise prepare``.
@@ -142,31 +79,6 @@ and the exact command to run next::
       -h, --help            show this help message and exit
       --out-path-name PATH  Base output path of the full reconstruction
 
-Initialization
-==============
-
-If you used ``denoise prepare``, the config file is already written and you can
-proceed directly to training.
-
-If you prefer to set up the config manually, copy the baseline template to the
-**parent directory** of your reconstructions and edit it::
-
-    (denoise) $ cp /path/to/Noise2Inverse360/baseline_config.yaml \
-               /data/sample_rec_config.yaml
-
-Set at minimum:
-
-.. code-block:: yaml
-
-    dataset:
-      directory_to_reconstructions: /path/to          # parent folder containing all three rec dirs
-      sub_recon_name0: experiment_rec_0               # even-angle sub-reconstruction folder
-      sub_recon_name1: experiment_rec_1               # odd-angle sub-reconstruction folder
-      full_recon_name: experiment_rec                 # full reconstruction folder
-
-The config file can live anywhere — the path is passed explicitly to every
-``denoise`` command via ``--config``.
-
 Training
 ========
 
@@ -180,8 +92,7 @@ is required.
 .. note::
 
    Make sure the ``denoise`` conda environment is active before running training.
-   If you used a different environment (e.g. ``tomocupy``) to create the
-   sub-reconstructions, switch back first::
+   If you used ``tomocupy`` to create the sub-reconstructions, switch back first::
 
        $ conda activate denoise
 
@@ -295,6 +206,61 @@ in-place whenever a new best is found:
    produced ``best_val_model.pth`` at epoch 1705 (val loss 0.053) and
    ``best_edge_model.pth`` at epoch 1650 — both suitable for inference.
 
+What the model learns
+---------------------
+
+The Noise2Inverse model learns the **noise statistics of the imaging system**,
+not anything about the sample itself.  The model is fully **sample-independent**
+and can be reused across datasets as long as the acquisition conditions remain
+the same.
+
+The network characterises:
+
+* Detector read noise and dark current
+* Shot noise at the specific photon flux (energy × exposure × beam current)
+* Scintillator glow and afterglow patterns
+* Ring artifact signatures from detector pixel non-uniformity
+* Any systematic noise from the lens and optic combination
+
+What does **not** affect reusability:
+
+* Sample composition, density, or size
+* Rotation axis position
+* Number of projections (within reason)
+* Binning (as long as ``psz`` in the config matches the binned pixel size)
+
+When to reuse vs. retrain
+--------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 50 25 25
+
+   * - Condition
+     - Reuse model?
+     - Action
+   * - Same beamline, same detector, same energy, same exposure
+     - **Yes**
+     - Use registry model directly
+   * - Same setup, different sample
+     - **Yes**
+     - Use registry model directly
+   * - Same setup, different binning
+     - **Yes** (if ``psz`` adjusted)
+     - Update ``psz`` in config
+   * - Same setup, slightly different exposure (±20%)
+     - **Likely yes**
+     - Try inference; retrain if quality is poor
+   * - Different energy or significantly different flux
+     - **No**
+     - Retrain on new sub-reconstructions
+   * - Different detector or scintillator
+     - **No**
+     - Retrain on new sub-reconstructions
+   * - Different beamline
+     - **No**
+     - Retrain on new sub-reconstructions
+
 Resuming interrupted training
 -----------------------------
 
@@ -304,12 +270,11 @@ optimiser state (Adam momentum), epoch counter, ``model_updates``, all best
 values, and the full loss history.  If training is interrupted for any reason,
 restart from the last completed epoch with ``--resume``::
 
-    (denoise) $ denoise train --config sample_rec_config.yaml --gpus 0,1 --resume
+    (denoise) $ denoise train --config /data/sample_rec_config.yaml --gpus 0,1 --resume
 
 Training continues from epoch ``N+1`` where ``N`` is the last fully completed
-epoch.  All three best-model checkpoints (``best_val_model.pth``,
-``best_lcl_model.pth``, ``best_edge_model.pth``) are preserved and remain
-usable for inference at any point.
+epoch.  All three best-model checkpoints are preserved and usable for inference
+at any point.
 
 .. note::
 
@@ -352,7 +317,7 @@ denoise slice
 
 Denoise a single CT slice::
 
-    (denoise) $ denoise slice --config sample_rec_config.yaml --slice-number 500
+    (denoise) $ denoise slice --config /data/sample_rec_config.yaml --slice-number 500
     2025-01-01 10:00:00,000 - Loading slice 500
     2025-01-01 10:00:05,000 - Saved denoised slice to .../denoised_slices/00500.tiff
 
@@ -386,7 +351,7 @@ denoise volume
 
 Denoise the entire CT volume::
 
-    (denoise) $ denoise volume --config sample_rec_config.yaml
+    (denoise) $ denoise volume --config /data/sample_rec_config.yaml
     2025-01-01 10:00:00,000 - Loading data into CPU memory, it will take a while ...
     2025-01-01 10:00:30,000 - Loaded 1000 slices of size 2048x2048
     2025-01-01 10:00:30,100 - Patch volume size: 65536x256x256
@@ -398,7 +363,7 @@ Denoise the entire CT volume::
 
 To denoise only a sub-volume (slices 200 to 400)::
 
-    (denoise) $ denoise volume --config sample_rec_config.yaml --start-slice 200 --end-slice 400
+    (denoise) $ denoise volume --config /data/sample_rec_config.yaml --start-slice 200 --end-slice 400
 
 The denoised volume is saved as individual TIFF files in
 ``<directory_to_reconstructions>/denoised_volume/``.
@@ -465,86 +430,6 @@ variation reflects OS disk-cache state. Stitching variation (~11–17 min) is
 due to system memory pressure. Training time dwarfs inference by ~38×; using
 4 GPUs would reduce training to roughly 10–12 hours.
 
-Reusing a trained model
-=======================
-
-The Noise2Inverse model learns the **noise statistics of the imaging system**,
-not anything about the sample itself.  This means the model is fully
-**sample-independent** and can be reused across datasets as long as the
-acquisition conditions that determine the noise remain the same.
-
-What the model learns
----------------------
-
-The network characterises:
-
-* Detector read noise and dark current
-* Shot noise at the specific photon flux (energy × exposure × beam current)
-* Scintillator glow and afterglow patterns
-* Ring artifact signatures from detector pixel non-uniformity
-* Any systematic noise from the lens and optic combination
-
-What does **not** affect reusability:
-
-* Sample composition, density, or size
-* Rotation axis position
-* Number of projections (within reason)
-* Binning (as long as ``psz`` in the config matches the binned pixel size)
-
-When to reuse vs. retrain
---------------------------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 50 25 25
-
-   * - Condition
-     - Reuse model?
-     - Action
-   * - Same beamline, same detector, same energy, same exposure
-     - **Yes**
-     - Update config paths only
-   * - Same setup, different sample
-     - **Yes**
-     - Update config paths only
-   * - Same setup, different binning
-     - **Yes** (if ``psz`` adjusted)
-     - Update ``psz`` in config
-   * - Same setup, slightly different exposure (±20%)
-     - **Likely yes**
-     - Try inference; retrain if quality is poor
-   * - Different energy or significantly different flux
-     - **No**
-     - Retrain on new sub-reconstructions
-   * - Different detector or scintillator
-     - **No**
-     - Retrain on new sub-reconstructions
-   * - Different beamline
-     - **No**
-     - Retrain on new sub-reconstructions
-
-How to reuse
-------------
-
-Copy the config file used for training, update the three path fields, and
-run inference as normal::
-
-    dataset:
-      directory_to_reconstructions: /path/to/new_experiment   # ← update
-      sub_recon_name0: new_experiment_rec_0                    # ← update
-      sub_recon_name1: new_experiment_rec_1                    # ← update
-      full_recon_name: new_experiment_rec                      # ← update
-      mean4norm: 0.1234    # ← keep from original training config
-      std4norm:  0.0567    # ← keep from original training config
-
-The ``mean4norm`` and ``std4norm`` values written by the training script
-handle intensity normalisation automatically — the new sample's absorption
-does not matter.
-
-Then run inference directly::
-
-    (denoise) $ denoise volume --config new_sample_rec_config.yaml --checkpoint val
-
 Model Registry
 ==============
 
@@ -582,8 +467,8 @@ parameters directly from the raw HDF5 file and writes them into the
       serial_number: 22150530
       exposure_time: 0.035 s
       temperature: 25.3 C
-      binning_x: 2.0
-      binning_y: 2.0
+      binning_x: 2
+      binning_y: 2
       propagation_distance: 100.0 mm
 
 This block is the basis for all registry matching.  The fields used to decide
@@ -648,8 +533,8 @@ Example output::
            type:                GGG:Eu - ESRF
            serial_number:       22150530
            exposure_time:       0.035 s
-           binning_x:           2.0
-           binning_y:           2.0
+           binning_x:           2
+           binning_y:           2
            registry path:       /home/user/.denoise/registry/2BM_pink_30keV_FLIROryx_20260219_143000
 
 ::
@@ -663,60 +548,22 @@ Example output::
       -h, --help     show this help message and exit
       --config FILE  Path to the YAML configuration file to match against
 
-Auto-search before training
-----------------------------
-
-By default, ``denoise train`` searches the registry automatically before
-launching a training run.
-
-**Match found** — compatible model(s) exist::
-
-    (denoise) $ denoise train --config /data/new_sample_rec_config.yaml --gpus 0,1
-
-    Registry search found 1 matching model(s):
-      [1] 2BM_pink_30keV_FLIROryx_20260219_143000  (9/9 criteria match — 100%)
-           ...
-           registry path: /home/user/.denoise/registry/2BM_pink_30keV_FLIROryx_20260219_143000
-    A compatible model may already exist. Copy the registry path above as --model-dir for slice/volume inference.
-
-    Train a new model anyway? [y/N]
-
-Entering **N** (or pressing Enter) cancels training so you can use the
-existing model.  Entering **y** proceeds with training as normal.
-
-**No match found** — registry is searched but no compatible model exists::
-
-    (denoise) $ denoise train --config /data/new_sample_rec_config.yaml --gpus 0,1
-
-    Registry search: no matching models found. Existing models:
-      - 2BM_pink_30keV_FLIROryx_22150530
-
-    Proceed with new training? [Y/n]
-
-Pressing Enter (or **Y**) starts training.  Entering **n** cancels so you can
-inspect the listed models manually before deciding.  If the registry is empty
-the message reads ``Registry search: registry is empty.`` and the same
-``[Y/n]`` prompt is shown.
-
-To skip the registry search entirely::
-
-    (denoise) $ denoise train --config sample_rec_config.yaml --gpus 0,1 --no-search
-
 Using a registered model for inference
 ----------------------------------------
 
-Point ``--model-dir`` at the registry entry to use it for inference on a
-new dataset::
+When ``denoise train`` finds a matching model and you cancel training, create a
+new config for the new dataset (via ``denoise prepare``) and add the
+normalisation statistics from the registered model's ``config.yaml``::
 
     dataset:
       directory_to_reconstructions: /data/new_experiment
-      sub_recon_name0: new_rec_0
-      sub_recon_name1: new_rec_1
-      full_recon_name: new_rec
-      mean4norm: 0.1234    # ← from the original training config
-      std4norm:  0.0567    # ← from the original training config
+      sub_recon_name0: new_sample_rec_0
+      sub_recon_name1: new_sample_rec_1
+      full_recon_name: new_sample_rec
+      mean4norm: 0.1234    # ← from the registered model's config.yaml
+      std4norm:  0.0567    # ← from the registered model's config.yaml
 
-Then run inference using the registered checkpoints::
+Then run inference directly::
 
     (denoise) $ denoise volume \
                     --config /data/new_sample_rec_config.yaml \
@@ -724,9 +571,9 @@ Then run inference using the registered checkpoints::
 
 .. note::
 
-   Copy ``mean4norm`` and ``std4norm`` from the registered model's
-   ``config.yaml`` into the new config before running inference.  These
-   normalisation statistics must match the values used during training.
+   ``mean4norm`` and ``std4norm`` are written by the training script and handle
+   intensity normalisation.  They must match the values used during training —
+   copy them from the registered model's ``config.yaml``.
 
 Command Reference
 =================
