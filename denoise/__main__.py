@@ -86,9 +86,10 @@ def prepare(args):
             log.error("Do not include %s in extra args — it is set automatically." % flag)
             raise RuntimeError("Forbidden flag: %s" % flag)
 
+    recon_cmd = getattr(args, 'recon_command', 'recon')
     for idx, label in ((0, 'even'), (1, 'odd')):
         log.info("Sub-reconstruction %d (%s projections) ..." % (idx, label))
-        cmd = ['tomocupy', 'recon'] + extra + [
+        cmd = ['tomocupy', recon_cmd] + extra + [
             '--start-proj', str(idx),
             '--proj-step',  '2',
             '--out-path-name', str(out_path) + '_%d' % idx,
@@ -418,6 +419,13 @@ def main():
         required=True,
         metavar='PATH',
         help='Base output path of the full reconstruction (tomocupy --out-path-name)',
+    )
+    prep_parser.add_argument(
+        '--recon-command',
+        type=str,
+        default='recon_steps',
+        choices=['recon', 'recon_steps'],
+        help='tomocupy subcommand to use for sub-reconstructions (default: recon_steps)',
     )
     prep_parser.add_argument(
         'tomocupy_args',
