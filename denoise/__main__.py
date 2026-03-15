@@ -37,6 +37,115 @@ from denoise import log
 
 
 
+def make_config(args):
+    """
+    Write a denoise config YAML derived from the HDF5 file path.
+
+    Output paths follow tomocupy convention:
+        /a/b/Li/sample.h5  ->  /a/b/Li_rec/sample_rec_config.yaml
+    """
+    import pathlib
+    import yaml
+
+    h5_path = pathlib.Path(args.file_name)
+    if args.out_path_name:
+        out_path = pathlib.Path(args.out_path_name)
+    else:
+        out_path = h5_path.parent.parent / (h5_path.parent.name + '_rec') / (h5_path.stem + '_rec')
+
+    parent_dir = out_path.parent
+    rec_name   = out_path.name
+
+    # Try to read instrument metadata from the HDF5 file (optional, for registry)
+    hdf_keys = [
+        '/process/acquisition/start_date',
+        '/measurement/sample/experimenter/name',
+        '/measurement/instrument/source/beamline',
+        '/measurement/instrument/source/current',
+        '/measurement/instrument/monochromator/energy',
+        '/measurement/instrument/monochromator/mode',
+        '/measurement/instrument/detection_system/scintillator/type',
+        '/measurement/instrument/detection_system/scintillator/active_thickness',
+        '/measurement/instrument/detection_system/objective/magnification',
+        '/measurement/instrument/detection_system/objective/resolution',
+        '/measurement/instrument/detector/manufacturer',
+        '/measurement/instrument/detector/model',
+        '/measurement/instrument/detector/serial_number',
+        '/measurement/instrument/detector/exposure_time',
+        '/measurement/instrument/detector/temperature',
+        '/measurement/instrument/detector/binning_x',
+        '/measurement/instrument/detector/binning_y',
+        '/measurement/instrument/detector_motor_stack/setup/z',
+    ]
+    metadata = {}
+    try:
+        import meta as meta_lib
+        mp = meta_lib.read_meta.Hdf5MetadataReader(str(h5_path))
+        meta_dict = mp.readMetadata()
+        mp.close()
+        for hdf_path in hdf_keys:
+            if hdf_path not in meta_dict:
+                continue
+            val   = meta_dict[hdf_path][0]
+            units = meta_dict[hdf_path][1]
+            key   = hdf_path.split('/')[-1]
+            if hdf_path == '/measurement/instrument/detector_motor_stack/setup/z':
+                key = 'propagation_distance'
+            if hasattr(val, 'item'):
+                val = val.item()
+            if key == 'mode':
+                metadata[key] = {0: 'mono', 1: 'pink', 2: 'white'}.get(int(val), str(val))
+            elif units is None or isinstance(val, str):
+                metadata[key] = val
+            else:
+                metadata[key] = '%s %s' % (val, units)
+        log.info("Instrument metadata read from: %s" % h5_path)
+    except ImportError:
+        log.warning("'meta' library not installed — skipping metadata block.")
+    except Exception as exc:
+        log.warning("Could not read metadata from %s: %s" % (h5_path, exc))
+
+    config = {
+        'dataset': {
+            'directory_to_reconstructions': str(parent_dir),
+            'sub_recon_name0': '%s_0' % rec_name,
+            'sub_recon_name1': '%s_1' % rec_name,
+            'full_recon_name': rec_name,
+        },
+        'train':  {'psz': 256, 'n_slices': 5, 'mbsz': 32, 'lr': 0.001,
+                   'warmup': 2000, 'maxep': 2000},
+        'infer':  {'overlap': 0.5, 'window': 'cosine'},
+    }
+    if metadata:
+        config['metadata'] = metadata
+
+    parent_dir.mkdir(parents=True, exist_ok=True)
+    config_path = parent_dir / ('%s_config.yaml' % rec_name)
+    with open(config_path, 'w') as fh:
+        yaml.dump(config, fh, default_flow_style=False, sort_keys=False)
+
+    out_path_name0 = str(parent_dir / ('%s_0' % rec_name))
+    out_path_name1 = str(parent_dir / ('%s_1' % rec_name))
+
+    log.info("Config written to: %s" % config_path)
+    log.info(
+        "Step 1 — run these two tomocupy reconstructions (tomocupy env):\n\n"
+        "  tomocupy recon_steps \\\n"
+        "    --file-name %s \\\n"
+        "    --start-proj 0 --proj-step 2 \\\n"
+        "    --out-path-name %s\n\n"
+        "  tomocupy recon_steps \\\n"
+        "    --file-name %s \\\n"
+        "    --start-proj 1 --proj-step 2 \\\n"
+        "    --out-path-name %s\n\n"
+        "Step 2 — train the denoising model (denoise env):\n\n"
+        "  denoise train --config %s --gpus 0,1"
+        % (args.file_name, out_path_name0,
+           args.file_name, out_path_name1,
+           config_path)
+    )
+
+
 def _print_registry_matches(matches):
     """Print a formatted table of registry search results."""
     log.warning("Registry search found %d matching model(s):" % len(matches))
@@ -339,6 +448,30 @@ def main():
             )
 
         cmd_parser.set_defaults(_func=func)
+
+    # --- prepare ---
+    cfg_parser = subparsers.add_parser(
+        'prepare',
+        help='Write a denoise config YAML from an HDF5 file path',
+        description='Write a denoise config YAML. Output paths are derived from --file-name '
+                    'using tomocupy convention: <parent>_rec/<stem>_rec',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    cfg_parser.add_argument(
+        '--file-name',
+        type=str,
+        required=True,
+        metavar='FILE',
+        help='Path to the raw HDF5 file',
+    )
+    cfg_parser.add_argument(
+        '--out-path-name',
+        type=str,
+        default=None,
+        metavar='PATH',
+        help='Override the derived output base path (tomocupy --out-path-name)',
+    )
+    cfg_parser.set_defaults(_func=make_config)
 
     # --- register ---
     reg_parser = subparsers.add_parser(
