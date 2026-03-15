@@ -89,9 +89,8 @@ class TomoDatasetTrain(Dataset):
         self.split1 /= split1_std
         log.info(f"\nSplit 1 is scaled with calculated mean: {split1_mean}, std: {split1_std}")
     
-        # write mean and std to yaml file
-        log.info('Saving training mean and standard deviation to configuration file to be used for inferencing')
-        save_normalization_value(config_file=config_file, mean=split0_mean, std=split0_std)
+        self.split0_mean = split0_mean
+        self.split0_std  = split0_std
 
         self.samples = self.__len__()
     

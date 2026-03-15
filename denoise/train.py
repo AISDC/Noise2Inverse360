@@ -70,9 +70,17 @@ def run(args):
 
     log.info("Loading data into CPU memory, it will take a while ...")
     ds_train = TomoDatasetTrain(params=params, config_file=args.config)
+
+    # Only rank 0 writes normalization stats to the config file to avoid race conditions
+    if rank == 0:
+        from denoise.data import save_normalization_value
+        log.info("Saving training mean and standard deviation to configuration file to be used for inferencing")
+        save_normalization_value(config_file=args.config, mean=ds_train.split0_mean, std=ds_train.split0_std)
+    torch.distributed.barrier()
+
     train_sampler = DistributedSampler(dataset=ds_train, shuffle=True, drop_last=True)
     dl_train = DataLoader(dataset=ds_train, batch_size=params['train']['mbsz'], sampler=train_sampler,
-                          num_workers=4, drop_last=False, prefetch_factor=params['train']['mbsz'], pin_memory=True)
+                          num_workers=4, drop_last=False, prefetch_factor=2, pin_memory=True)
 
     log.info("Loaded %d samples into CPU memory for training." % len(ds_train))
 
