@@ -54,8 +54,8 @@ Dependencies include:
                 -   `config.yaml`
             -   Created by `denoise train` / inference:
                 -   TrainOutput (Directory)
-                -   `denoised_slices/`
-                -   `denoised_volume/`
+                -   `<sample>_denoised_slices/`
+                -   `<sample>_denoised_volume/`
 
 -   Data is saved as `.tiff` files (`.tif` or `.tiff`).
 
@@ -213,7 +213,7 @@ denoise slice --config /data/sample_rec_config.yaml --slice-number 500
 -   Fetches slice ± neighboring slices (2.5D)
 -   Applies sliding window patching
 -   Normalizes using training statistics
--   Saves `.tiff` to `denoised_slices/`
+-   Saves `.tiff` to `<sample>_denoised_slices/`
 
 ### Denoise Volume
 
@@ -223,7 +223,7 @@ denoise volume --config /data/sample_rec_config.yaml --start-slice 500 --end-sli
 ```
 
 -   Optionally denoise slice subset
--   Directory `denoised_volume/` is recreated each run
+-   Directory `<sample>_denoised_volume/` is recreated each run
 -   Automatic batch size calculation
 -   Sliding window patching
 -   Mini-batch inference

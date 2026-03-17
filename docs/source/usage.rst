@@ -387,10 +387,10 @@ Denoise a single CT slice::
 
     (denoise) $ denoise slice --config /data/sample_rec_config.yaml --slice-number 500
     2025-01-01 10:00:00,000 - Loading slice 500
-    2025-01-01 10:00:05,000 - Saved denoised slice to .../denoised_slices/00500.tiff
+    2025-01-01 10:00:05,000 - Saved denoised slice to .../sample_denoised_slices/00500.tiff
 
 The denoised slice is saved as a TIFF in
-``<directory_to_reconstructions>/denoised_slices/``.
+``<directory_to_reconstructions>/<full_recon_name without _rec>_denoised_slices/``.
 
 ::
 
@@ -426,7 +426,7 @@ Denoise the entire CT volume::
     2025-01-01 10:00:30,200 - Processing data ...
     ...
     2025-01-01 10:05:00,000 - Stitching denoised data ...
-    2025-01-01 10:05:10,000 - Saving data to .../denoised_volume ...
+    2025-01-01 10:05:10,000 - Saving data to .../sample_denoised_volume ...
     2025-01-01 10:05:30,000 - Done.
 
 To denoise only a sub-volume (slices 200 to 400)::
@@ -434,7 +434,7 @@ To denoise only a sub-volume (slices 200 to 400)::
     (denoise) $ denoise volume --config /data/sample_rec_config.yaml --start-slice 200 --end-slice 400
 
 The denoised volume is saved as individual TIFF files in
-``<directory_to_reconstructions>/denoised_volume/``.
+``<directory_to_reconstructions>/<full_recon_name without _rec>_denoised_volume/``.
 
 ::
 
