@@ -33,7 +33,9 @@ def run(args):
         params = yaml.safe_load(file)
 
     # setup output directory
-    output_dir = params['dataset']['directory_to_reconstructions'] + '/' + 'denoised_volume'
+    full_recon_name = params['dataset']['full_recon_name']
+    base_name = full_recon_name[:-4] if full_recon_name.endswith('_rec') else full_recon_name
+    output_dir = params['dataset']['directory_to_reconstructions'] + '/' + base_name + '_denoised_volume'
     if os.path.isdir(output_dir):
         shutil.rmtree(output_dir)
     os.mkdir(output_dir)

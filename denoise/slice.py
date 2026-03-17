@@ -29,7 +29,9 @@ def run(args):
         params = yaml.safe_load(file)
 
     # create directory for denoised slices
-    out_path = params['dataset']['directory_to_reconstructions'] + '/' + 'denoised_slices'
+    full_recon_name = params['dataset']['full_recon_name']
+    base_name = full_recon_name[:-4] if full_recon_name.endswith('_rec') else full_recon_name
+    out_path = params['dataset']['directory_to_reconstructions'] + '/' + base_name + '_denoised_slices'
     if not os.path.isdir(out_path):
         os.mkdir(out_path)
 
