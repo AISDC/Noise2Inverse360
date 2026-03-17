@@ -13,20 +13,36 @@ def laplacian_batch(x):
     return F.conv2d(x, kernel, padding=1, groups=x.shape[1])
 
 class LCL(nn.Module):
-    def __init__(self, ):
-        super(LCL, self).__init__()
+    def __init__(self, q=0.80, eps=1e-6):
+        super().__init__()
+        self.q = q
+        self.eps = eps
 
     def forward(self, pred):
+        # differentiable path
         L = torch.abs(laplacian_batch(pred))
-        threshold = torch.quantile(L, .80)
-        edge_mask = (L > threshold)
-        flat_mask = ~edge_mask
+        B = L.shape[0]
+        L_flat = L.view(B, -1)
 
-        edge_mean = L[edge_mask].mean() if edge_mask.any() else 0.0
-        flat_mean = L[flat_mask].mean() if flat_mask.any() else 1e-6
+        # non-differentiable mask construction
+        with torch.no_grad():
+            thresh = torch.quantile(L_flat.detach(), self.q, dim=1, keepdim=True)
+            thresh = thresh.view(B, 1, 1, 1)
+            edge_mask = L.detach() > thresh
+            flat_mask = ~edge_mask
 
-        # Encourage this ratio to grow (i.e., minimize the inverse)
-        return flat_mean / (edge_mean + 1e-6)
+        # use masks to select values from differentiable L
+        if edge_mask.any():
+            edge_mean = L[edge_mask].mean()
+        else:
+            edge_mean = L.new_tensor(0.0)
+
+        if flat_mask.any():
+            flat_mean = L[flat_mask].mean()
+        else:
+            flat_mean = L.new_tensor(self.eps)
+
+        return flat_mean / (edge_mean + self.eps)
     
 
 def laplacian_entropy_map(lap, bins = 256):
