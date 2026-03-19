@@ -216,6 +216,23 @@ To skip the registry search entirely, add ``--no-search``::
 
     (denoise) $ denoise train --config /data/sample_rec_config.yaml --gpus 0,1 --no-search
 
+Running multiple training jobs on the same node
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``torchrun`` binds to port ``29500`` by default.  If you launch a second
+training job on the same machine (e.g. two datasets on a 4-GPU node),
+the second job will fail with ``EADDRINUSE``.  Use ``--master-port`` to
+assign a different port to each job::
+
+    # job 1 — GPUs 0,1, default port
+    (denoise) $ denoise train --config /data/delta_config.yaml --gpus 0,1 --no-search
+
+    # job 2 — GPUs 2,3, different port
+    (denoise) $ denoise train --config /data/beta_config.yaml --gpus 2,3 --no-search --master-port 29501
+
+``--master-port`` only needs to be set for the second (and subsequent)
+jobs; the first job can always use the default.
+
 Launch training with two GPUs::
 
     (denoise) $ denoise train --config /data/sample_rec_config.yaml --gpus 0,1
@@ -359,16 +376,17 @@ at any point.
 ::
 
     (denoise) $ denoise train -h
-    usage: denoise train [-h] --config FILE [--gpus IDS] [--resume] [--no-search]
+    usage: denoise train [-h] --config FILE [--gpus IDS] [--resume] [--no-search] [--master-port PORT]
 
     Train the Noise2Inverse model
 
     options:
-      -h, --help     show this help message and exit
-      --config FILE  Path to the YAML configuration file
-      --gpus IDS     Comma-separated list of visible GPU IDs (default: 0)
-      --resume       Resume from the last completed epoch (requires resume.pth in TrainOutput/)
-      --no-search    Skip registry search before training
+      -h, --help          show this help message and exit
+      --config FILE       Path to the YAML configuration file
+      --gpus IDS          Comma-separated list of visible GPU IDs (default: 0)
+      --resume            Resume from the last completed epoch (requires resume.pth in TrainOutput/)
+      --no-search         Skip registry search before training
+      --master-port PORT  torchrun rendezvous port (default: 29500); change when running multiple jobs on the same node
 
 Inference
 =========

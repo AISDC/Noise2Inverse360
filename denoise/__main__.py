@@ -222,6 +222,7 @@ def train(args):
         cmd = [
             sys.executable, '-m', 'torch.distributed.run',
             '--nproc_per_node', str(n_gpus),
+            '--master_port', str(args.master_port),
             '-m', 'denoise', 'train',
             '--config', args.config,
             '--gpus', args.gpus,
@@ -406,6 +407,13 @@ def main():
                 action='store_true',
                 default=False,
                 help='Skip registry search before training',
+            )
+            cmd_parser.add_argument(
+                '--master-port',
+                type=int,
+                default=29500,
+                metavar='PORT',
+                help='torchrun rendezvous port (change when running multiple jobs on the same node)',
             )
 
         elif cmd == 'slice':

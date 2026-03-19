@@ -179,6 +179,18 @@ Resume interrupted training with `--resume`:
 (denoise) $ denoise train --config /data/sample_rec_config.yaml --gpus 0,1 --resume
 ```
 
+To run two training jobs in parallel on the same node (e.g. two datasets
+on a 4-GPU machine), assign a different `--master-port` to each job to
+avoid a port conflict:
+
+``` bash
+# job 1 — GPUs 0,1, default port
+(denoise) $ denoise train --config /data/delta_config.yaml --gpus 0,1 --no-search
+
+# job 2 — GPUs 2,3, different port
+(denoise) $ denoise train --config /data/beta_config.yaml --gpus 2,3 --no-search --master-port 29501
+```
+
 ### Registering a trained model
 
 After training, register the model so it can be found automatically in
