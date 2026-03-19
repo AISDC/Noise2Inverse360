@@ -113,7 +113,7 @@ def make_config(args):
             'full_recon_name': rec_name,
         },
         'train':  {'psz': 256, 'n_slices': 5, 'mbsz': 32, 'lr': 0.001,
-                   'warmup': 2000, 'maxep': 2000},
+                   'warmup': 2000, 'maxep': 2000, 'patience': 0},
         'infer':  {'overlap': 0.5, 'window': 'cosine'},
     }
     if metadata:

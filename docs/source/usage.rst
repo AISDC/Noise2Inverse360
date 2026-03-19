@@ -373,6 +373,29 @@ at any point.
    ``n_slices``).  You may safely increase ``maxep`` to extend training beyond
    the original limit.
 
+Early stopping
+--------------
+
+By default, training runs for ``maxep`` epochs regardless of convergence.
+To stop automatically when the validation loss stops improving, add a
+``patience`` key to the ``train`` section of the config:
+
+.. code-block:: yaml
+
+    train:
+      psz: 256
+      n_slices: 5
+      mbsz: 32
+      lr: 0.001
+      warmup: 2000
+      maxep: 2000
+      patience: 200   # stop if val loss does not improve for 200 consecutive epochs
+
+``patience: 0`` (the default) disables early stopping.  The counter resets
+each time a new best validation loss is found and only starts after warmup
+completes.  The state is saved in ``resume.pth`` so it is preserved across
+``--resume`` restarts.
+
 ::
 
     (denoise) $ denoise train -h

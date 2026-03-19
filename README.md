@@ -173,6 +173,14 @@ Train a new model anyway? [y/N]
 Enter **N** to skip training and use the existing model, or **y** to
 train anyway.  To bypass the search entirely, add `--no-search`.
 
+To stop automatically when the validation loss plateaus, add `patience` to
+the `train` section of the config YAML (default `0` = disabled):
+
+```yaml
+train:
+  patience: 200   # stop if val loss does not improve for 200 epochs
+```
+
 Resume interrupted training with `--resume`:
 
 ``` bash

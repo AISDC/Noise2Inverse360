@@ -107,6 +107,8 @@ def run(args):
     train_lcl_loss, val_lcl_loss = [], []
     best_val_loss, best_edge, best_lcl_loss = np.inf, 0, np.inf
     best_val_epoch, best_edge_epoch, best_lcl_epoch = 0, 0, 0
+    epochs_since_improvement = 0
+    patience = params['train'].get('patience', 0)
 
     if getattr(args, 'resume', False):
         resume_path = f"{odir}/resume.pth"
@@ -129,6 +131,7 @@ def run(args):
         val_lcl_loss    = ckpt['val_lcl_loss']
         edge_values     = ckpt['edge_values']
         continue_warmup = ckpt['continue_warmup']
+        epochs_since_improvement = ckpt.get('epochs_since_improvement', 0)
         log.info("Resuming training from epoch %d (model_updates=%d)" % (start_epoch, model_updates))
     else:
         log.info('Initializing model from scratch')
@@ -219,10 +222,26 @@ def run(args):
                 step_val_losses.append(loss.detach().cpu().numpy())
                 step_lcl_val_loss.append(loss_lcl.cpu().numpy())
 
+        ep_time = time.time() - tick_ep
+
+        # Early stopping: rank world_size-1 decides, broadcasts to all ranks
+        stop_tensor = torch.zeros(1, dtype=torch.int32, device='cuda')
+        if rank == world_size - 1:
+            if patience > 0 and not continue_warmup:
+                if np.mean(step_val_losses) < best_val_loss:
+                    epochs_since_improvement = 0
+                else:
+                    epochs_since_improvement += 1
+                if epochs_since_improvement >= patience:
+                    stop_tensor.fill_(1)
+        torch.distributed.broadcast(stop_tensor, src=world_size - 1)
+        early_stop = bool(stop_tensor.item())
+
         if rank != world_size - 1:
+            if early_stop:
+                break
             continue
 
-        ep_time = time.time() - tick_ep
         log.info('Epoch %d' % epoch)
         log.info('[Train] L1 loss:    %.6f, %.6f => %.6f, rate: %.2fs/ep' % (
             np.mean(step_losses), step_losses[0], step_losses[-1], ep_time))
@@ -275,6 +294,7 @@ def run(args):
         if model_updates > warmup and continue_warmup:
             best_edge, best_lcl_loss = 0, np.inf
             best_edge_epoch, best_lcl_epoch = 0, 0
+            epochs_since_improvement = 0
             continue_warmup = False
 
         CRNT_TIME = time.time()
@@ -343,4 +363,9 @@ def run(args):
             'val_lcl_loss': val_lcl_loss,
             'edge_values': edge_values,
             'continue_warmup': continue_warmup,
+            'epochs_since_improvement': epochs_since_improvement,
         }, f"{odir}/resume.pth")
+
+        if early_stop:
+            log.info("Early stopping: no val loss improvement for %d epochs (best was epoch %d)" % (patience, best_val_epoch))
+            break
