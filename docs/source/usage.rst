@@ -492,6 +492,12 @@ The denoised volume is saved as individual TIFF files in
       --end-slice N                 End slice index (default: last slice)
       --checkpoint {val,lcl,edge}   Checkpoint to use (default: lcl)
 
+.. figure:: ../source/img/brain.png
+   :width: 100%
+   :align: center
+
+   Left: denoised — Right: noisy reconstruction (brain CT, APS 2-BM)
+
 Performance example
 ^^^^^^^^^^^^^^^^^^^
 
