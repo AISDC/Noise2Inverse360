@@ -109,7 +109,6 @@ def run(args):
     best_val_epoch, best_edge_epoch, best_lcl_epoch = 0, 0, 0
     epochs_since_improvement = 0
     patience = params['train'].get('patience', 0)
-    center_idx = n_slices // 2
 
     if getattr(args, 'resume', False):
         resume_path = f"{odir}/resume.pth"
@@ -157,11 +156,11 @@ def run(args):
                 
                 #Process first view
                 pred_view1 = model(X_mb_dev)
-                loss_view1 = criterion(pred_view1.squeeze(dim=1), Y_mb_dev[:, center_idx])
+                loss_view1 = criterion(pred_view1.squeeze(dim=1), Y_mb_dev[:, int(n_slices // 2)])
 
                 #Process second view
                 pred_view2 = model(Y_mb_dev)
-                loss_view2 = criterion(pred_view2.squeeze(dim=1), X_mb_dev[:, center_idx])
+                loss_view2 = criterion(pred_view2.squeeze(dim=1), X_mb_dev[:, int(n_slices // 2)])
 
                 loss = 0.5*(loss_view1 + loss_view2)
                 loss.backward()
@@ -178,8 +177,8 @@ def run(args):
                 pred_view1 = model(X_mb_dev)
                 pred_view2 = model(Y_mb_dev)
 
-                loss_view1 = criterion(pred_view1.squeeze(dim=1), Y_mb_dev[:, center_idx])
-                loss_view2 = criterion(pred_view2.squeeze(dim=1), X_mb_dev[:, center_idx])
+                loss_view1 = criterion(pred_view1.squeeze(dim=1), Y_mb_dev[:, int(n_slices // 2)])
+                loss_view2 = criterion(pred_view2.squeeze(dim=1), X_mb_dev[:, int(n_slices // 2)])
 
                 loss_lcl1 = criterion_lcl(pred_view1)*beta
                 loss_lcl2 = criterion_lcl(pred_view2)*beta
