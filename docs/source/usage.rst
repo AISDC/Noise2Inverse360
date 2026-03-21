@@ -373,6 +373,38 @@ at any point.
    ``n_slices``).  You may safely increase ``maxep`` to extend training beyond
    the original limit.
 
+Reducing training slices with z_stride
+---------------------------------------
+
+By default, all slices from the sub-reconstructions are loaded into RAM for
+training.  For large CT datasets, adjacent slices are highly correlated along Z,
+so using every slice is rarely necessary.  Set ``z_stride`` in the config to
+load only every Nth slice:
+
+.. code-block:: yaml
+
+    train:
+      psz: 256
+      n_slices: 5
+      mbsz: 32
+      lr: 0.001
+      warmup: 2000
+      maxep: 2000
+      z_stride: 5   # use every 5th slice — 5× less RAM and 5× faster epochs
+
+``z_stride: 1`` (the default) loads every slice.  A value of 5 is a good
+starting point for brain-sized datasets (~2000 slices): it retains full
+anatomical coverage while reducing load time and memory by ~5×.
+
+The ``warmup`` threshold is automatically divided by ``z_stride`` so that the
+number of warmup model updates stays proportional to the effective dataset size
+— no manual adjustment needed.
+
+.. note::
+
+   Do **not** use ``--resume`` after changing ``z_stride`` in the config —
+   the dataset size changes, which affects the epoch/update relationship.
+
 Early stopping
 --------------
 
