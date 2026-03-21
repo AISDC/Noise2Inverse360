@@ -96,7 +96,8 @@ def run(args):
     criterion = torch.nn.L1Loss()
     criterion_lcl = LCL()
     beta = .01
-    warmup = params['train']['warmup']
+    z_stride = params['train'].get('z_stride', 1)
+    warmup = params['train']['warmup'] // max(1, z_stride)
 
     # training state (overwritten on --resume)
     model_updates = 0
