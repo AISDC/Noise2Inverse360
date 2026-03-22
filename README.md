@@ -173,10 +173,30 @@ Train a new model anyway? [y/N]
 Enter **N** to skip training and use the existing model, or **y** to
 train anyway.  To bypass the search entirely, add `--no-search`.
 
+To stop automatically when the validation loss plateaus, add `patience` to
+the `train` section of the config YAML (default `0` = disabled):
+
+```yaml
+train:
+  patience: 200   # stop if val loss does not improve for 200 epochs
+```
+
 Resume interrupted training with `--resume`:
 
 ``` bash
 (denoise) $ denoise train --config /data/sample_rec_config.yaml --gpus 0,1 --resume
+```
+
+To run two training jobs in parallel on the same node (e.g. two datasets
+on a 4-GPU machine), assign a different `--master-port` to each job to
+avoid a port conflict:
+
+``` bash
+# job 1 — GPUs 0,1, default port
+(denoise) $ denoise train --config /data/delta_config.yaml --gpus 0,1 --no-search
+
+# job 2 — GPUs 2,3, different port
+(denoise) $ denoise train --config /data/beta_config.yaml --gpus 2,3 --no-search --master-port 29501
 ```
 
 ### Registering a trained model
@@ -229,10 +249,15 @@ denoise volume --config /data/sample_rec_config.yaml --start-slice 500 --end-sli
 -   Mini-batch inference
 -   Saves output `.tiffs`
 
-### Denoised Example 
+### Denoised Example
 
 <p align="center">
   <img src="docs/source/img/denoised_example4.svg" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/source/img/brain.png" width="800">
+  <br><em>Left: denoised &nbsp;|&nbsp; Right: noisy reconstruction (brain CT, APS 2-BM)</em>
 </p>
 
 ## Contributing

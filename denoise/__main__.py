@@ -113,7 +113,7 @@ def make_config(args):
             'full_recon_name': rec_name,
         },
         'train':  {'psz': 256, 'n_slices': 5, 'mbsz': 32, 'lr': 0.001,
-                   'warmup': 2000, 'maxep': 2000},
+                   'warmup': 2000, 'maxep': 2000, 'patience': 0},
         'infer':  {'overlap': 0.5, 'window': 'cosine'},
     }
     if metadata:
@@ -222,12 +222,15 @@ def train(args):
         cmd = [
             sys.executable, '-m', 'torch.distributed.run',
             '--nproc_per_node', str(n_gpus),
+            '--master_port', str(args.master_port),
             '-m', 'denoise', 'train',
             '--config', args.config,
             '--gpus', args.gpus,
         ]
         if getattr(args, 'resume', False):
             cmd.append('--resume')
+        if getattr(args, 'finetune', None):
+            cmd.extend(['--finetune', args.finetune])
         log.info("Launching training via torchrun (%d GPU(s)) ..." % n_gpus)
         result = subprocess.run(cmd, env=env)
         sys.exit(result.returncode)
@@ -402,10 +405,25 @@ def main():
                 help='Resume training from the last completed epoch (requires resume.pth in TrainOutput/)',
             )
             cmd_parser.add_argument(
+                '--finetune',
+                type=str,
+                default=None,
+                metavar='DIR_OR_PTH',
+                help='Fine-tune from a pre-trained model: path to a registry directory or a .pth file. '
+                     'Loads model weights only; all training state resets from scratch.',
+            )
+            cmd_parser.add_argument(
                 '--no-search',
                 action='store_true',
                 default=False,
                 help='Skip registry search before training',
+            )
+            cmd_parser.add_argument(
+                '--master-port',
+                type=int,
+                default=29500,
+                metavar='PORT',
+                help='torchrun rendezvous port (change when running multiple jobs on the same node)',
             )
 
         elif cmd == 'slice':
@@ -422,6 +440,14 @@ def main():
                 default='lcl',
                 choices=['val', 'lcl', 'edge'],
                 help='Checkpoint to use: val=lowest val loss, lcl=lowest LCL loss, edge=highest edge score',
+            )
+            cmd_parser.add_argument(
+                '--model-dir',
+                type=str,
+                default=None,
+                metavar='DIR',
+                help='Directory containing model checkpoints (registry entry or TrainOutput/). '
+                     'Defaults to <directory_to_reconstructions>/TrainOutput/',
             )
 
         elif cmd == 'volume':
@@ -445,6 +471,14 @@ def main():
                 default='lcl',
                 choices=['val', 'lcl', 'edge'],
                 help='Checkpoint to use: val=lowest val loss, lcl=lowest LCL loss, edge=highest edge score',
+            )
+            cmd_parser.add_argument(
+                '--model-dir',
+                type=str,
+                default=None,
+                metavar='DIR',
+                help='Directory containing model checkpoints (registry entry or TrainOutput/). '
+                     'Defaults to <directory_to_reconstructions>/TrainOutput/',
             )
 
         cmd_parser.set_defaults(_func=func)
