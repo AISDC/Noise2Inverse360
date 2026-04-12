@@ -28,6 +28,15 @@ def run(args):
     with open(args.config, 'r') as file:
         params = yaml.safe_load(file)
 
+    # 3D mode operates on full volumes — single-slice inference is not meaningful
+    mode = getattr(args, 'mode', None) or params['train'].get('mode', '2.5d')
+    if mode == '3d':
+        raise RuntimeError(
+            "The 'slice' command is not available in --mode 3d.\n"
+            "3D denoising processes full volumes. Use:\n\n"
+            "  denoise volume --config %s --mode 3d" % args.config
+        )
+
     # create directory for denoised slices
     full_recon_name = params['dataset']['full_recon_name']
     base_name = full_recon_name[:-4] if full_recon_name.endswith('_rec') else full_recon_name
@@ -42,7 +51,9 @@ def run(args):
     n_slices = params['train']['n_slices']
     _ckpt_map = {'val': 'best_val_model.pth', 'lcl': 'best_lcl_model.pth', 'edge': 'best_edge_model.pth'}
     ckpt_name = _ckpt_map[getattr(args, 'checkpoint', 'lcl')]
-    path_to_mdl = params['dataset']['directory_to_reconstructions'] + '/' + 'TrainOutput' + '/' + ckpt_name
+    model_dir = getattr(args, 'model_dir', None) or \
+        params['dataset']['directory_to_reconstructions'] + '/TrainOutput'
+    path_to_mdl = os.path.join(model_dir, ckpt_name)
     log.info("Using checkpoint: %s" % ckpt_name)
     checkpoint = torch.load(path_to_mdl, map_location=torch.device('cpu'), weights_only=False)
     model = unet_ns_gn(ich=n_slices, start_filter_size=16, channels_per_group=8)

@@ -105,6 +105,20 @@ def make_config(args):
     except Exception as exc:
         log.warning("Could not read metadata from %s: %s" % (h5_path, exc))
 
+    mode = getattr(args, 'mode', None) or '2.5d'
+    if mode == '3d':
+        train_block = {
+            'psz': 256, 'psz_3d': 64, 'n_slices': 5,
+            'nb_patches_3d': 1000, 'mbsz': 4,
+            'lr': 0.001, 'warmup': 2000, 'maxep': 2000, 'patience': 0,
+            'mode': '3d',
+        }
+    else:
+        train_block = {
+            'psz': 256, 'n_slices': 5, 'mbsz': 32,
+            'lr': 0.001, 'warmup': 2000, 'maxep': 2000, 'patience': 0,
+        }
+
     config = {
         'dataset': {
             'directory_to_reconstructions': str(parent_dir),
@@ -112,9 +126,8 @@ def make_config(args):
             'sub_recon_name1': '%s_1' % rec_name,
             'full_recon_name': rec_name,
         },
-        'train':  {'psz': 256, 'n_slices': 5, 'mbsz': 32, 'lr': 0.001,
-                   'warmup': 2000, 'maxep': 2000},
-        'infer':  {'overlap': 0.5, 'window': 'cosine'},
+        'train':  train_block,
+        'infer':  {'overlap': 0.5, 'window': 'hann' if mode == '3d' else 'cosine'},
     }
     if metadata:
         config['metadata'] = metadata
@@ -222,12 +235,17 @@ def train(args):
         cmd = [
             sys.executable, '-m', 'torch.distributed.run',
             '--nproc_per_node', str(n_gpus),
+            '--master_port', str(args.master_port),
             '-m', 'denoise', 'train',
             '--config', args.config,
             '--gpus', args.gpus,
         ]
         if getattr(args, 'resume', False):
             cmd.append('--resume')
+        if getattr(args, 'finetune', None):
+            cmd.extend(['--finetune', args.finetune])
+        if getattr(args, 'mode', None):
+            cmd.extend(['--mode', args.mode])
         log.info("Launching training via torchrun (%d GPU(s)) ..." % n_gpus)
         result = subprocess.run(cmd, env=env)
         sys.exit(result.returncode)
@@ -393,6 +411,15 @@ def main():
             metavar='IDS',
             help='Comma-separated list of visible GPU IDs',
         )
+        cmd_parser.add_argument(
+            '--mode',
+            type=str,
+            default=None,
+            choices=['2.5d', '3d'],
+            metavar='MODE',
+            help='Convolution mode: "2.5d" (default, stacked 2D slices) or "3d" (full 3D U-Net). '
+                 'Overrides the mode stored in the YAML config.',
+        )
 
         if cmd == 'train':
             cmd_parser.add_argument(
@@ -402,10 +429,25 @@ def main():
                 help='Resume training from the last completed epoch (requires resume.pth in TrainOutput/)',
             )
             cmd_parser.add_argument(
+                '--finetune',
+                type=str,
+                default=None,
+                metavar='DIR_OR_PTH',
+                help='Fine-tune from a pre-trained model: path to a registry directory or a .pth file. '
+                     'Loads model weights only; all training state resets from scratch.',
+            )
+            cmd_parser.add_argument(
                 '--no-search',
                 action='store_true',
                 default=False,
                 help='Skip registry search before training',
+            )
+            cmd_parser.add_argument(
+                '--master-port',
+                type=int,
+                default=29500,
+                metavar='PORT',
+                help='torchrun rendezvous port (change when running multiple jobs on the same node)',
             )
 
         elif cmd == 'slice':
@@ -422,6 +464,14 @@ def main():
                 default='lcl',
                 choices=['val', 'lcl', 'edge'],
                 help='Checkpoint to use: val=lowest val loss, lcl=lowest LCL loss, edge=highest edge score',
+            )
+            cmd_parser.add_argument(
+                '--model-dir',
+                type=str,
+                default=None,
+                metavar='DIR',
+                help='Directory containing model checkpoints (registry entry or TrainOutput/). '
+                     'Defaults to <directory_to_reconstructions>/TrainOutput/',
             )
 
         elif cmd == 'volume':
@@ -445,6 +495,14 @@ def main():
                 default='lcl',
                 choices=['val', 'lcl', 'edge'],
                 help='Checkpoint to use: val=lowest val loss, lcl=lowest LCL loss, edge=highest edge score',
+            )
+            cmd_parser.add_argument(
+                '--model-dir',
+                type=str,
+                default=None,
+                metavar='DIR',
+                help='Directory containing model checkpoints (registry entry or TrainOutput/). '
+                     'Defaults to <directory_to_reconstructions>/TrainOutput/',
             )
 
         cmd_parser.set_defaults(_func=func)
@@ -470,6 +528,14 @@ def main():
         default=None,
         metavar='PATH',
         help='Override the derived output base path (tomocupy --out-path-name)',
+    )
+    cfg_parser.add_argument(
+        '--mode',
+        type=str,
+        default='2.5d',
+        choices=['2.5d', '3d'],
+        metavar='MODE',
+        help='Convolution mode to pre-configure in the generated YAML: "2.5d" (default) or "3d"',
     )
     cfg_parser.set_defaults(_func=make_config)
 

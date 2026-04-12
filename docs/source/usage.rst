@@ -19,6 +19,37 @@ predict one from the other, removing noise without any clean reference images.
    You must create the two sub-reconstructions from the raw projection data
    before proceeding.
 
+Choosing a convolution mode
+===========================
+
+All ``denoise`` commands that touch the model accept a ``--mode`` flag:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 60 25
+
+   * - ``--mode``
+     - Description
+     - Typical use
+   * - ``2.5d`` *(default)*
+     - 2D U-Net; stacks N adjacent slices as channels.
+       Fast and memory-efficient.
+     - General synchrotron CT
+   * - ``3d``
+     - Full 3D U-Net with skip connections; operates on cubic sub-volumes.
+       Removes structured 3D noise and ring artifacts.
+     - Coherent X-ray / XNH microscopy
+
+The mode is **saved into the YAML config** at the start of training, so
+you do not need to repeat ``--mode`` at inference time — the config already
+knows which model type was used.  You can always override by passing
+``--mode`` explicitly.
+
+.. note::
+
+   The ``denoise slice`` command is only available in ``--mode 2.5d``.
+   In 3D mode, use ``denoise volume`` instead.
+
 denoise prepare
 ---------------
 
@@ -26,7 +57,11 @@ Run ``denoise prepare`` (in the ``denoise`` environment) to write the
 config YAML and print the two ``tomocupy recon_steps`` commands you need
 to run next::
 
+    # 2.5D (default)
     (denoise) $ denoise prepare --file-name /data/sample.h5
+
+    # 3D — generates a YAML pre-configured with 3D training parameters
+    (denoise) $ denoise prepare --file-name /data/sample.h5 --mode 3d
 
 This reads instrument metadata from the HDF5 file, writes
 ``sample_rec_config.yaml``, and prints the exact ``tomocupy recon_steps``
@@ -177,7 +212,11 @@ prompts you with the result.
 
 .. code-block:: text
 
+    # 2.5D (default)
     (denoise) $ denoise train --config /data/sample_rec_config.yaml --gpus 0,1
+
+    # 3D mode
+    (denoise) $ denoise train --config /data/sample_rec_config.yaml --gpus 0,1 --mode 3d
 
     Registry search found 1 matching model(s):
       [1] 2BM_pink_30keV_FLIROryx_22150530  (9/9 criteria match — 100%)
@@ -215,6 +254,23 @@ If the registry is empty the message reads ``Registry search: registry is empty.
 To skip the registry search entirely, add ``--no-search``::
 
     (denoise) $ denoise train --config /data/sample_rec_config.yaml --gpus 0,1 --no-search
+
+Running multiple training jobs on the same node
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``torchrun`` binds to port ``29500`` by default.  If you launch a second
+training job on the same machine (e.g. two datasets on a 4-GPU node),
+the second job will fail with ``EADDRINUSE``.  Use ``--master-port`` to
+assign a different port to each job::
+
+    # job 1 — GPUs 0,1, default port
+    (denoise) $ denoise train --config /data/delta_config.yaml --gpus 0,1 --no-search
+
+    # job 2 — GPUs 2,3, different port
+    (denoise) $ denoise train --config /data/beta_config.yaml --gpus 2,3 --no-search --master-port 29501
+
+``--master-port`` only needs to be set for the second (and subsequent)
+jobs; the first job can always use the default.
 
 Launch training with two GPUs::
 
@@ -329,6 +385,38 @@ When to reuse vs. retrain
      - **No**
      - Retrain on new sub-reconstructions
 
+Fine-tuning a pre-trained model
+--------------------------------
+
+Instead of training from scratch, you can initialise the network with weights
+from a previously trained model and continue training on a new dataset.  This
+is useful when acquisition conditions are similar but not identical — fine-tuning
+for a fraction of the original epochs may be sufficient:
+
+.. code-block:: bash
+
+    # fine-tune from a registry entry
+    (denoise) $ denoise train \
+                    --config /data/new_sample_config.yaml \
+                    --gpus 0,1,2,3 \
+                    --finetune ~/.denoise/registry/2BM_pink_30keV_FLIROryx_22150530 \
+                    --no-search
+
+    # fine-tune from a specific .pth file
+    (denoise) $ denoise train \
+                    --config /data/new_sample_config.yaml \
+                    --gpus 0,1,2,3 \
+                    --finetune /data/brain_beta/TrainOutput/best_val_model.pth \
+                    --no-search
+
+``--finetune`` loads **model weights only** — all training state (epoch,
+loss history, best values) resets from scratch.  When a registry directory is
+given, ``best_val_model.pth`` is used automatically.
+
+.. note::
+
+   ``--finetune`` and ``--resume`` are mutually exclusive.
+
 Resuming interrupted training
 -----------------------------
 
@@ -356,25 +444,135 @@ at any point.
    ``n_slices``).  You may safely increase ``maxep`` to extend training beyond
    the original limit.
 
+Reducing training slices with z_stride
+---------------------------------------
+
+By default, all slices from the sub-reconstructions are loaded into RAM for
+training.  For large CT datasets, adjacent slices are highly correlated along Z,
+so using every slice is rarely necessary.  Set ``z_stride`` in the config to
+load only every Nth slice:
+
+.. code-block:: yaml
+
+    train:
+      psz: 256
+      n_slices: 5
+      mbsz: 32
+      lr: 0.001
+      warmup: 2000
+      maxep: 2000
+      z_stride: 5   # use every 5th slice — 5× less RAM and 5× faster epochs
+
+``z_stride: 1`` (the default) loads every slice.  A value of 5 is a good
+starting point for brain-sized datasets (~2000 slices): it retains full
+anatomical coverage while reducing load time and memory by ~5×.
+
+The ``warmup`` threshold is automatically divided by ``z_stride`` so that the
+number of warmup model updates stays proportional to the effective dataset size
+— no manual adjustment needed.
+
+.. note::
+
+   Do **not** use ``--resume`` after changing ``z_stride`` in the config —
+   the dataset size changes, which affects the epoch/update relationship.
+
+Early stopping
+--------------
+
+By default, training runs for ``maxep`` epochs regardless of convergence.
+To stop automatically when the validation loss stops improving, add a
+``patience`` key to the ``train`` section of the config:
+
+.. code-block:: yaml
+
+    train:
+      psz: 256
+      n_slices: 5
+      mbsz: 32
+      lr: 0.001
+      warmup: 2000
+      maxep: 2000
+      patience: 200   # stop if val loss does not improve for 200 consecutive epochs
+
+``patience: 0`` (the default) disables early stopping.  The counter resets
+each time a new best validation loss is found and only starts after warmup
+completes.  The state is saved in ``resume.pth`` so it is preserved across
+``--resume`` restarts.
+
 ::
 
     (denoise) $ denoise train -h
-    usage: denoise train [-h] --config FILE [--gpus IDS] [--resume] [--no-search]
+    usage: denoise train [-h] --config FILE [--gpus IDS] [--mode MODE] [--resume] [--no-search] [--master-port PORT]
 
     Train the Noise2Inverse model
 
     options:
-      -h, --help     show this help message and exit
-      --config FILE  Path to the YAML configuration file
-      --gpus IDS     Comma-separated list of visible GPU IDs (default: 0)
-      --resume       Resume from the last completed epoch (requires resume.pth in TrainOutput/)
-      --no-search    Skip registry search before training
+      -h, --help          show this help message and exit
+      --config FILE       Path to the YAML configuration file
+      --gpus IDS          Comma-separated list of visible GPU IDs (default: 0)
+      --mode MODE         Convolution mode: 2.5d (default) or 3d
+      --resume            Resume from the last completed epoch (requires resume.pth in TrainOutput/)
+      --no-search         Skip registry search before training
+      --master-port PORT  torchrun rendezvous port (default: 29500); change when running multiple jobs on the same node
+
+3D mode configuration
+---------------------
+
+When ``--mode 3d`` is used (or ``denoise prepare --mode 3d`` was run), the
+generated YAML includes 3D-specific training parameters:
+
+.. code-block:: yaml
+
+    dataset:
+      directory_to_reconstructions: /data/sample_rec
+      sub_recon_name0: sample_rec_0
+      sub_recon_name1: sample_rec_1
+      full_recon_name: sample_rec
+
+    train:
+      psz: 256          # 2.5D patch size (ignored in 3D mode)
+      psz_3d: 64        # 3D cubic patch size — must be divisible by 2**n_blocks_3d
+      n_slices: 5       # 2.5D stack depth (ignored in 3D mode)
+      nb_patches_3d: 1000  # number of random 3D patches per epoch
+      n_blocks_3d: 3    # U-Net encoder depth (3 = receptive field ~64³)
+      start_filts_3d: 32  # filter count of first encoder block
+      mbsz: 4           # batch size — 3D patches are large; use 2–8 per GPU
+      lr: 0.001
+      warmup: 2000
+      maxep: 2000
+      patience: 0
+      mode: '3d'        # saved automatically; read by slice/volume commands
+
+    infer:
+      overlap: 0.5      # patch overlap fraction for 3D sliding window
+      window: hann      # blending window (hann recommended for 3D)
+
+Key differences from 2.5D config:
+
+* ``psz_3d`` replaces ``psz`` for 3D patch size.  Must be divisible by
+  ``2**n_blocks_3d`` (e.g. 64 for 3 blocks, 128 for 3 blocks with more context).
+* ``mbsz`` should be much smaller than in 2.5D — a 64³ patch at fp32 is ~1 MB,
+  so 4–8 fit comfortably on a 40 GB GPU alongside the model.
+* ``nb_patches_3d`` sets how many random cubic patches are sampled per epoch.
+  1000 is a reasonable starting point; increase for larger volumes.
+
+.. tip::
+
+   Start with ``psz_3d: 64``, ``n_blocks_3d: 3``, ``mbsz: 4``.
+   If GPU memory allows, try ``psz_3d: 96`` or ``n_blocks_3d: 4`` for a
+   larger receptive field.
 
 Inference
 =========
 
-denoise slice
--------------
+denoise slice (2.5D only)
+-------------------------
+
+.. note::
+
+   ``denoise slice`` is only available in **2.5D mode**.  In 3D mode, use
+   ``denoise volume`` instead (single-slice inference is not meaningful for
+   a model trained on cubic patches).
 
 .. tip::
 
@@ -392,10 +590,19 @@ Denoise a single CT slice::
 The denoised slice is saved as a TIFF in
 ``<directory_to_reconstructions>/<full_recon_name without _rec>_denoised_slices/``.
 
+By default the model is loaded from ``<directory_to_reconstructions>/TrainOutput/``.
+To use a registered model instead, pass ``--model-dir``::
+
+    (denoise) $ denoise slice \
+                    --config /data/sample_rec_config.yaml \
+                    --slice-number 500 \
+                    --checkpoint val \
+                    --model-dir ~/.denoise/registry/2BM_pink_30keV_FLIROryx_22150530_brain_beta_z5
+
 ::
 
     (denoise) $ denoise slice -h
-    usage: denoise slice [-h] --config FILE [--gpus IDS] --slice-number N [--checkpoint {val,lcl,edge}]
+    usage: denoise slice [-h] --config FILE [--gpus IDS] --slice-number N [--checkpoint {val,lcl,edge}] [--model-dir DIR]
 
     Denoise a single CT slice
 
@@ -405,6 +612,7 @@ The denoised slice is saved as a TIFF in
       --gpus IDS                    Comma-separated list of visible GPU IDs (default: 0)
       --slice-number N              Index of the CT slice to denoise
       --checkpoint {val,lcl,edge}   Checkpoint to use (default: lcl)
+      --model-dir DIR               Directory containing model checkpoints (default: TrainOutput/)
 
 denoise volume
 --------------
@@ -419,7 +627,11 @@ denoise volume
 
 Denoise the entire CT volume::
 
+    # 2.5D (default — or when mode is already stored in the config YAML)
     (denoise) $ denoise volume --config /data/sample_rec_config.yaml
+
+    # 3D
+    (denoise) $ denoise volume --config /data/sample_rec_config.yaml --mode 3d
     2025-01-01 10:00:00,000 - Loading data into CPU memory, it will take a while ...
     2025-01-01 10:00:30,000 - Loaded 1000 slices of size 2048x2048
     2025-01-01 10:00:30,100 - Patch volume size: 65536x256x256
@@ -439,7 +651,7 @@ The denoised volume is saved as individual TIFF files in
 ::
 
     (denoise) $ denoise volume -h
-    usage: denoise volume [-h] --config FILE [--gpus IDS] [--start-slice N] [--end-slice N] [--checkpoint {val,lcl,edge}]
+    usage: denoise volume [-h] --config FILE [--gpus IDS] [--start-slice N] [--end-slice N] [--checkpoint {val,lcl,edge}] [--model-dir DIR]
 
     Denoise the entire CT volume
 
@@ -450,6 +662,13 @@ The denoised volume is saved as individual TIFF files in
       --start-slice N               Start slice index (default: first slice)
       --end-slice N                 End slice index (default: last slice)
       --checkpoint {val,lcl,edge}   Checkpoint to use (default: lcl)
+      --model-dir DIR               Directory containing model checkpoints (default: TrainOutput/)
+
+.. figure:: ../source/img/brain.png
+   :width: 100%
+   :align: center
+
+   Left: denoised — Right: noisy reconstruction (brain CT, APS 2-BM)
 
 Performance example
 ^^^^^^^^^^^^^^^^^^^
